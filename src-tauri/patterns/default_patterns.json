@@ -1,0 +1,83 @@
+[
+  {
+    "id": "absolute-http-url",
+    "name": "Absolute HTTP endpoint",
+    "description": "General absolute HTTP or HTTPS URL found in source/configuration.",
+    "category": "absolute-url",
+    "confidence": "medium",
+    "regex": "(https?://[A-Za-z0-9][A-Za-z0-9._~:/?#\\[\\]@!$&()*+,;=%-]{3,})",
+    "extract_group": 1
+  },
+  {
+    "id": "openapi-server-url",
+    "name": "OpenAPI server URL",
+    "description": "Server/base URL declaration commonly used in OpenAPI or API configuration.",
+    "category": "openapi",
+    "confidence": "high",
+    "regex": "(?i)\\b(?:url|server|baseUrl|base_url)\\s*[:=]\\s*[\\\"']?(https?://[^\\\"'\\s,}]+)",
+    "extract_group": 1
+  },
+  {
+    "id": "js-fetch-axios",
+    "name": "JavaScript HTTP client call",
+    "description": "Absolute endpoint supplied to fetch or an axios HTTP method.",
+    "category": "http-client",
+    "confidence": "high",
+    "regex": "(?i)\\b(?:fetch|axios\\.(?:get|post|put|patch|delete|head|options))\\s*\\(\\s*[\\\"'`](https?://[^\\\"'`\\s)]+)",
+    "extract_group": 1
+  },
+  {
+    "id": "python-requests",
+    "name": "Python requests call",
+    "description": "Absolute endpoint supplied to Python requests.",
+    "category": "http-client",
+    "confidence": "high",
+    "regex": "(?i)\\brequests\\.(?:get|post|put|patch|delete|head|options)\\s*\\(\\s*[\\\"'](https?://[^\\\"'\\s)]+)",
+    "extract_group": 1
+  },
+  {
+    "id": "endpoint-environment-variable",
+    "name": "Endpoint/base URL assignment",
+    "description": "A URL assigned to a common endpoint/base-URL configuration name.",
+    "category": "configuration",
+    "confidence": "high",
+    "regex": "(?i)\\b(?:API_URL|API_BASE_URL|BASE_URL|SERVICE_URL|ENDPOINT|GRAPHQL_URL)\\b\\s*[:=]\\s*[\\\"']?(https?://[^\\\"'\\s,;]+)",
+    "extract_group": 1
+  },
+  {
+    "id": "express-route",
+    "name": "Express-style REST route",
+    "description": "Relative REST route declared on app/router/server objects.",
+    "category": "rest-route",
+    "confidence": "high",
+    "regex": "(?i)\\b(?:app|router|server)\\.(?:get|post|put|patch|delete|head|options)\\s*\\(\\s*[\\\"'`](/[^\\\"'`?\\s]*)",
+    "extract_group": 1
+  },
+  {
+    "id": "axum-route",
+    "name": "Axum-style route",
+    "description": "Relative route declaration using a route(...) call.",
+    "category": "rest-route",
+    "confidence": "medium",
+    "regex": "\\broute\\s*\\(\\s*[\\\"'](/[^\\\"'\\s]*)",
+    "extract_group": 1
+  },
+  {
+    "id": "spring-mapping",
+    "name": "Spring mapping route",
+    "description": "Spring MVC request mapping annotation with a relative path.",
+    "category": "rest-route",
+    "confidence": "high",
+    "regex": "(?i)@(?:Get|Post|Put|Patch|Delete|Request)Mapping\\s*\\(\\s*[\\\"'](/[^\\\"'\\s]*)",
+    "extract_group": 1
+  },
+  {
+    "id": "openapi-path-key",
+    "name": "OpenAPI path entry",
+    "description": "Likely OpenAPI path key for common API route prefixes.",
+    "category": "openapi",
+    "confidence": "medium",
+    "regex": "^\\s{0,12}(/(?:api|v[0-9]+|health|status|graphql|auth|users|admin)[^:\\s]*)\\s*:\\s*$",
+    "extract_group": 1
+  }
+]
