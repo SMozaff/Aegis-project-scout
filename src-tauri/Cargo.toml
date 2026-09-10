@@ -34,3 +34,8 @@ codegen-units = 1
 lto = true
 opt-level = "s"
 strip = true
+
+[lints.rust]
+dead_code = "allow"
+unused_variables = "allow"
+unused_imports = "warn"
