@@ -1,7 +1,7 @@
 use anyhow::{anyhow, Result};
 use base64::Engine;
 use reqwest::header::{HeaderMap, HeaderValue, ACCEPT, AUTHORIZATION, USER_AGENT};
-use serde::Deserialize;
+use serde::{de::DeserializeOwned, Deserialize};
 use std::collections::HashSet;
 use tokio::time::{sleep, Duration};
 
@@ -19,12 +19,18 @@ pub struct GithubScanner {
 #[derive(Deserialize)]
 struct CodeSearchResult {
     #[serde(default)]
+    total_count: u64,
+    #[serde(default)]
+    incomplete_results: bool,
+    #[serde(default)]
     items: Vec<CodeSearchItem>,
 }
 
 #[derive(Deserialize)]
 struct CodeSearchItem {
     repository: Repo,
+    #[serde(default)]
+    score: f64,
 }
 
 #[derive(Deserialize)]
@@ -48,7 +54,9 @@ struct Owner {
 
 #[derive(Deserialize)]
 struct Content {
+    #[serde(default)]
     content: String,
+    #[serde(default)]
     encoding: String,
 }
 
@@ -104,11 +112,9 @@ impl GithubScanner {
                         break;
                     }
                     let result: CodeSearchResult = self
-                        .request(format!(
+                        .request_json(format!(
                             "{API}/search/code?q={encoded}&page={page}&per_page={RESULTS_PER_QUERY}"
                         ))
-                        .await?
-                        .json()
                         .await?;
                     if result.items.is_empty() {
                         break;
@@ -202,18 +208,14 @@ impl GithubScanner {
 
     pub async fn fetch_readme(&self, owner: &str, repo: &str) -> Result<String> {
         let content: Content = self
-            .request(format!("{API}/repos/{owner}/{repo}/readme"))
-            .await?
-            .json()
+            .request_json(format!("{API}/repos/{owner}/{repo}/readme"))
             .await?;
         decode(content)
     }
 
     pub async fn fetch_code_file(&self, owner: &str, repo: &str, path: &str) -> Result<String> {
         let content: Content = self
-            .request(format!("{API}/repos/{owner}/{repo}/contents/{path}"))
-            .await?
-            .json()
+            .request_json(format!("{API}/repos/{owner}/{repo}/contents/{path}"))
             .await?;
         decode(content)
     }
@@ -224,14 +226,45 @@ impl GithubScanner {
             if response.status().is_success() {
                 return Ok(response);
             }
-            if response.status().as_u16() == 403 || response.status().as_u16() == 429 {
+            let status = response.status();
+            let text = response.text().await?;
+            if status.as_u16() == 403 || status.as_u16() == 429 {
+                if attempt == 4 {
+                    return Err(anyhow!(
+                        "GitHub API rate limit exceeded ({}). Reduce scan limits or wait and retry. Body: {}",
+                        status,
+                        truncate(&text, 200)
+                    ));
+                }
                 sleep(Duration::from_secs(2u64.pow(attempt))).await;
                 continue;
             }
-            return Err(anyhow!("GitHub API error {}", response.status()));
+            return Err(anyhow!(
+                "GitHub API error ({}): {}",
+                status,
+                truncate(&text, 300)
+            ));
         }
-        Err(anyhow!("GitHub rate limit exceeded"))
+        Err(anyhow!("GitHub API request failed after retries"))
     }
+
+    async fn request_json<T: DeserializeOwned>(&self, url: String) -> Result<T> {
+        let response = self.request(url).await?;
+        let status = response.status();
+        let text = response.text().await?;
+        serde_json::from_str(&text).map_err(|error| {
+            anyhow!(
+                "Failed to parse GitHub response ({}): {} — body: {}",
+                status,
+                error,
+                truncate(&text, 300)
+            )
+        })
+    }
+}
+
+fn truncate(value: &str, max_chars: usize) -> String {
+    value.chars().take(max_chars).collect()
 }
 
 fn decode(content: Content) -> Result<String> {

@@ -36,6 +36,7 @@ pub struct ScanConfig {
     pub languages: Vec<String>,
     pub lookback_days: u16,
     pub max_repositories: u16,
+    #[serde(default = "default_true")]
     pub health_check: bool,
     pub max_files_per_repository: u16,
 }
