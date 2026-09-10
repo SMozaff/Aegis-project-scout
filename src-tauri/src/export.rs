@@ -21,7 +21,7 @@ pub fn export(app: &AppHandle, report: &ScanReport, format: &str) -> Result<Expo
 
     match format.as_str() {
         "json" => {
-            let bytes = serde_json::to_vec_pretty(&redacted_json_report(report))
+            let bytes = serde_json::to_vec_pretty(report)
                 .map_err(|e| format!("Unable to serialize JSON report: {e}"))?;
             fs::write(&path, bytes).map_err(|e| format!("Unable to write JSON report: {e}"))?;
         }
@@ -46,8 +46,10 @@ fn export_directory(app: &AppHandle) -> Result<PathBuf, String> {
 }
 
 fn write_csv(path: &PathBuf, report: &ScanReport) -> Result<(), String> {
-    let mut writer =
-        csv::Writer::from_path(path).map_err(|e| format!("Unable to create CSV report: {e}"))?;
+    let mut writer = csv::WriterBuilder::new()
+        .flexible(true)
+        .from_path(path)
+        .map_err(|e| format!("Unable to create CSV report: {e}"))?;
 
     writer
         .write_record([
@@ -62,7 +64,6 @@ fn write_csv(path: &PathBuf, report: &ScanReport) -> Result<(), String> {
             "confidence",
             "file_path",
             "line_number",
-            "captured",
             "health_reachable",
             "health_blocked",
             "health_status",
@@ -97,8 +98,6 @@ fn write_csv(path: &PathBuf, report: &ScanReport) -> Result<(), String> {
                     String::new(),
                     String::new(),
                     String::new(),
-                    String::new(),
-                    String::new(),
                     csv_safe(&finding.warnings.join(" | ")),
                 ])
                 .map_err(|e| format!("Unable to write CSV row: {e}"))?;
@@ -124,7 +123,6 @@ fn write_csv(path: &PathBuf, report: &ScanReport) -> Result<(), String> {
                     csv_safe(&matched.confidence),
                     csv_safe(&matched.file_path),
                     matched.line_number.to_string(),
-                    String::new(),
                     health.map(|h| h.reachable.to_string()).unwrap_or_default(),
                     health.map(|h| h.blocked.to_string()).unwrap_or_default(),
                     health
@@ -152,6 +150,7 @@ fn write_csv(path: &PathBuf, report: &ScanReport) -> Result<(), String> {
             "source_file",
             "line_number",
             "pattern_name",
+            "verification_kind",
             "verification_detail",
         ])
         .map_err(|e| format!("Unable to write verified credentials header: {e}"))?;
@@ -163,6 +162,7 @@ fn write_csv(path: &PathBuf, report: &ScanReport) -> Result<(), String> {
                 csv_safe(&credential.source_file),
                 credential.line_number.to_string(),
                 csv_safe(&credential.pattern_name),
+                csv_safe(verification_kind(&credential.outcome)),
                 csv_safe(verification_detail(&credential.outcome)),
             ])
             .map_err(|e| format!("Unable to write verified credential row: {e}"))?;
@@ -174,25 +174,12 @@ fn write_csv(path: &PathBuf, report: &ScanReport) -> Result<(), String> {
     Ok(())
 }
 
-fn redacted_json_report(report: &ScanReport) -> serde_json::Value {
-    let mut value = serde_json::to_value(report).unwrap_or_else(|_| serde_json::json!({}));
-    value["verified_credentials"] = serde_json::Value::Array(
-        report
-            .verified_credentials
-            .iter()
-            .map(|credential| {
-                serde_json::json!({
-                    "provider": credential.provider,
-                    "source_repo": credential.source_repo,
-                    "source_file": credential.source_file,
-                    "line_number": credential.line_number,
-                    "pattern_name": credential.pattern_name,
-                    "outcome": { "detail": verification_detail(&credential.outcome) },
-                })
-            })
-            .collect(),
-    );
-    value
+fn verification_kind(outcome: &VerifyOutcome) -> &str {
+    match outcome {
+        VerifyOutcome::Valid { .. } => "valid",
+        VerifyOutcome::Invalid { .. } => "invalid",
+        VerifyOutcome::Unverifiable { .. } => "unverifiable",
+    }
 }
 
 fn verification_detail(outcome: &VerifyOutcome) -> &str {
@@ -208,5 +195,79 @@ fn csv_safe(value: &str) -> String {
         format!("'{value}")
     } else {
         value
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::models::{AppSettings, ScanMetrics, ScanReport, VerifiedCredential};
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn report_with_credentials(verified_credentials: Vec<VerifiedCredential>) -> ScanReport {
+        ScanReport {
+            generated_at: "2026-09-10T00:00:00Z".into(),
+            started_at: "2026-09-10T00:00:00Z".into(),
+            completed_at: "2026-09-10T00:00:01Z".into(),
+            settings: AppSettings::default(),
+            metrics: ScanMetrics::default(),
+            findings: Vec::new(),
+            verified_credentials,
+        }
+    }
+
+    fn sample_credentials() -> Vec<VerifiedCredential> {
+        vec![
+            VerifiedCredential {
+                provider: "openai".into(),
+                source_repo: "owner/repo".into(),
+                source_file: "README.md".into(),
+                line_number: 12,
+                pattern_name: "openai_legacy".into(),
+                outcome: VerifyOutcome::Valid {
+                    detail: "accepted".into(),
+                },
+            },
+            VerifiedCredential {
+                provider: "github".into(),
+                source_repo: "owner/repo,2".into(),
+                source_file: "config.yml".into(),
+                line_number: 34,
+                pattern_name: "github_pat_fg".into(),
+                outcome: VerifyOutcome::Unverifiable {
+                    reason: "rate limited".into(),
+                },
+            },
+        ]
+    }
+
+    #[test]
+    fn json_export_contains_empty_verified_credentials_array() {
+        let value = serde_json::to_value(report_with_credentials(Vec::new())).unwrap();
+        assert_eq!(value["verified_credentials"], serde_json::json!([]));
+    }
+
+    #[test]
+    fn json_and_csv_exports_render_two_verified_credentials() {
+        let report = report_with_credentials(sample_credentials());
+        let value = serde_json::to_value(&report).unwrap();
+        assert_eq!(value["verified_credentials"].as_array().unwrap().len(), 2);
+        assert_eq!(value["verified_credentials"][0]["outcome"]["kind"], "valid");
+        assert_eq!(value["verified_credentials"][1]["outcome"]["kind"], "unverifiable");
+
+        let filename = format!(
+            "aegis-export-test-{}.csv",
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        );
+        let path = std::env::temp_dir().join(filename);
+        write_csv(&path, &report).unwrap();
+        let csv = fs::read_to_string(&path).unwrap();
+        assert!(csv.contains("provider,source_repo,source_file,line_number,pattern_name,verification_kind,verification_detail"));
+        assert!(csv.contains("openai,owner/repo,README.md,12,openai_legacy,valid,accepted"));
+        assert!(csv.contains("github,\"owner/repo,2\",config.yml,34,github_pat_fg,unverifiable,rate limited"));
+        let _ = fs::remove_file(path);
     }
 }
