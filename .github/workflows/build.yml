@@ -1,9 +1,9 @@
-name: Build & Test
+name: CI & Release
 
 on:
   push:
     branches: [main]
-    tags: ['v*']
+    tags: ["v*"]
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -17,23 +17,20 @@ env:
   RUST_BACKTRACE: 1
 
 jobs:
-  test:
-    name: Test & Lint
-    runs-on: ubuntu-22.04
-    steps:
-      - uses: actions/checkout@v4
+  # ─────────────────────────────────────────────────────────────
+  # 1. Quality gate — runs on every push/PR
+  # ─────────────────────────────────────────────────────────────
+  quality:
+    name: Quality (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
 
-      - name: Install Linux deps
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libwebkit2gtk-4.1-dev \
-            libappindicator3-dev \
-            librsvg2-dev \
-            patchelf \
-            libssl-dev \
-            build-essential \
-            curl wget file libxdo-dev libayatana-appindicator3-dev
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -46,56 +43,13 @@ jobs:
         with:
           components: rustfmt, clippy
 
-      - name: Cache Rust
+      - name: Rust cache
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
 
-      - name: Install npm deps
-        run: npm ci
-
-      - name: Frontend build
-        run: npm run build
-
-      - name: Rust fmt check
-        working-directory: src-tauri
-        run: cargo fmt --all -- --check
-
-      - name: Rust clippy
-        working-directory: src-tauri
-        run: cargo clippy --all-targets -- -D warnings
-
-      - name: Rust test
-        working-directory: src-tauri
-        run: cargo test --all
-
-  build:
-    name: Build ${{ matrix.platform }}
-    needs: test
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - platform: ubuntu-22.04
-            target: x86_64-unknown-linux-gnu
-            artifact_name: linux-x86_64
-          - platform: windows-latest
-            target: x86_64-pc-windows-msvc
-            artifact_name: windows-x86_64
-          - platform: macos-14
-            target: aarch64-apple-darwin
-            artifact_name: macos-arm64
-          - platform: macos-14
-            target: x86_64-apple-darwin
-            artifact_name: macos-x86_64
-
-    runs-on: ${{ matrix.platform }}
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Linux deps
-        if: matrix.platform == 'ubuntu-22.04'
+      - name: Install Linux system deps
+        if: matrix.os == 'ubuntu-latest'
         run: |
           sudo apt-get update
           sudo apt-get install -y \
@@ -104,8 +58,61 @@ jobs:
             librsvg2-dev \
             patchelf \
             libssl-dev \
-            build-essential \
-            curl wget file libxdo-dev libayatana-appindicator3-dev
+            libgtk-3-dev \
+            libayatana-appindicator3-dev
+
+      - name: Install frontend deps
+        run: npm ci
+
+      - name: TypeScript type check
+        run: npx tsc --noEmit
+
+      - name: Frontend build
+        run: npm run build
+
+      - name: Rust format check
+        working-directory: src-tauri
+        run: cargo fmt --all -- --check
+
+      - name: Rust clippy
+        working-directory: src-tauri
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: Rust tests
+        working-directory: src-tauri
+        run: cargo test --all-features
+
+      - name: Rust build (debug)
+        working-directory: src-tauri
+        run: cargo build --all-features
+
+  # ─────────────────────────────────────────────────────────────
+  # 2. Release build — runs only on version tags
+  # ─────────────────────────────────────────────────────────────
+  release:
+    name: Release (${{ matrix.label }})
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: quality
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            label: linux-x86_64
+            args: ""
+          - os: windows-latest
+            label: windows-x86_64
+            args: ""
+          - os: macos-latest
+            label: macos-universal
+            args: "--target universal-apple-darwin"
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -116,15 +123,27 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ matrix.target }}
+          targets: ${{ matrix.os == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
 
-      - name: Cache Rust
+      - name: Rust cache
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
-          key: ${{ matrix.target }}
 
-      - name: Install npm deps
+      - name: Install Linux system deps
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            libssl-dev \
+            libgtk-3-dev \
+            libayatana-appindicator3-dev
+
+      - name: Install frontend deps
         run: npm ci
 
       - name: Build Tauri app
@@ -132,15 +151,85 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          args: --target ${{ matrix.target }}
+          tagName: ${{ github.ref_name }}
+          releaseName: "Raven API Hunter ${{ github.ref_name }}"
+          releaseBody: |
+            Automated release for `${{ github.ref_name }}`.
+
+            Builds:
+            - Linux: `.deb`, `.AppImage`
+            - Windows: `.msi`, `.exe`
+            - macOS: `.dmg`, `.app` (universal binary — Intel + Apple Silicon)
+          releaseDraft: true
+          prerelease: false
+          args: ${{ matrix.args }}
+
+  # ─────────────────────────────────────────────────────────────
+  # 3. (Optional) Nightly test builds — manual trigger only
+  # ─────────────────────────────────────────────────────────────
+  nightly:
+    name: Nightly build (${{ matrix.label }})
+    if: github.event_name == 'workflow_dispatch' && !startsWith(github.ref, 'refs/tags/')
+    needs: quality
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            label: linux-x86_64
+          - os: windows-latest
+            label: windows-x86_64
+          - os: macos-latest
+            label: macos-universal
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install Linux system deps
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            libssl-dev \
+            libgtk-3-dev \
+            libayatana-appindicator3-dev
+
+      - name: Install frontend deps
+        run: npm ci
+
+      - name: Build Tauri app
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          args: ${{ matrix.os == 'macos-latest' && '--target universal-apple-darwin' || '' }}
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: aegis-project-scout-${{ matrix.artifact_name }}
+          name: raven-api-hunter-${{ matrix.label }}
           path: |
-            src-tauri/target/${{ matrix.target }}/release/bundle/**
-            src-tauri/target/${{ matrix.target }}/release/*.exe
-            src-tauri/target/${{ matrix.target }}/release/aegis-project-scout
+            src-tauri/target/release/bundle/**
+            src-tauri/target/universal-apple-darwin/release/bundle/**
+          if-no-files-found: ignore
           retention-days: 14
-          if-no-files-found: warn
