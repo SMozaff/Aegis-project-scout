@@ -136,7 +136,7 @@ fn trim_capture(value: &str) -> String {
     value
         .trim()
         .trim_matches(|c: char| matches!(c, '\'' | '"' | '`' | ',' | ';'))
-        .trim_end_matches(|c: char| matches!(c, ')' | ']' | '}'))
+        .trim_end_matches([')', ']', '}'])
         .to_string()
 }
 

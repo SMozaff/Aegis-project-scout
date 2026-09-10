@@ -190,7 +190,7 @@ fn verification_detail(outcome: &VerifyOutcome) -> &str {
 }
 
 fn csv_safe(value: &str) -> String {
-    let value = value.replace('\r', " ").replace('\n', " ");
+    let value = value.replace(['\r', '\n'], " ");
     if matches!(value.chars().next(), Some('=' | '+' | '-' | '@')) {
         format!("'{value}")
     } else {

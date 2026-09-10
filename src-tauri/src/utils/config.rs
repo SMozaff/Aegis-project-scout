@@ -41,8 +41,10 @@ fn config_path() -> Result<PathBuf> {
 pub fn load_config() -> Result<AppConfig> {
     let path = config_path()?;
     if !path.exists() {
-        let mut config = AppConfig::default();
-        config.patterns = load_patterns().unwrap_or_default();
+        let config = AppConfig {
+            patterns: load_patterns().unwrap_or_default(),
+            ..Default::default()
+        };
         save_config(&config)?;
         return Ok(config);
     }
