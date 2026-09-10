@@ -108,6 +108,7 @@ impl PatternAnalyzer {
             }
         }
 
+        matches.sort_by_key(|matched| (matched.category != "auth_token") as u8);
         matches
     }
 

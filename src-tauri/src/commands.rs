@@ -264,6 +264,8 @@ pub async fn run_scan(
             }
         }
 
+        matches.sort_by_key(|matched| (matched.category != "auth_token") as u8);
+
         let mut verified_count = 0u32;
         if config.verify_credentials {
             let auth_match_indices: Vec<usize> = matches
@@ -308,6 +310,7 @@ pub async fn run_scan(
 
         let endpoints: Vec<String> = matches
             .iter()
+            .filter(|matched| matched.category == "endpoint")
             .filter_map(|matched| matched.absolute_endpoint.clone())
             .collect::<HashSet<_>>()
             .into_iter()
