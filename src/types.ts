@@ -33,6 +33,7 @@ export interface PatternMatch {
   excerpt: string;
   captured: string;
   absolute_endpoint?: string | null;
+  verification?: VerifyOutcome | null;
 }
 
 export interface EndpointHealth {
@@ -50,6 +51,7 @@ export interface RepositoryFinding {
   matches: PatternMatch[];
   health: EndpointHealth[];
   warnings: string[];
+  verified_count: number;
 }
 
 export interface ScanMetrics {
@@ -69,6 +71,7 @@ export interface ScanReport {
   settings: AppSettings;
   metrics: ScanMetrics;
   findings: RepositoryFinding[];
+  verified_credentials: VerifiedCredential[];
 }
 
 export interface ScanProgress {
@@ -90,6 +93,15 @@ export type VerifyOutcome =
   | { kind: "valid"; detail: string }
   | { kind: "invalid"; detail: string }
   | { kind: "unverifiable"; reason: string };
+
+export interface VerifiedCredential {
+  provider: string;
+  source_repo: string;
+  source_file: string;
+  line_number: number;
+  pattern_name: string;
+  outcome: VerifyOutcome;
+}
 
 export interface ExportResult {
   path: string;

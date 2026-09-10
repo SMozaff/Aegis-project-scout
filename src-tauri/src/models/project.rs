@@ -64,6 +64,17 @@ pub struct RepositoryFinding {
     pub matches: Vec<crate::models::endpoint::PatternMatch>,
     pub health: Vec<crate::models::endpoint::EndpointHealth>,
     pub warnings: Vec<String>,
+    pub verified_count: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VerifiedCredential {
+    pub provider: String,
+    pub source_repo: String,
+    pub source_file: String,
+    pub line_number: u32,
+    pub pattern_name: String,
+    pub outcome: crate::scanner::verify::VerifyOutcome,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -85,6 +96,7 @@ pub struct ScanReport {
     pub settings: crate::models::AppSettings,
     pub metrics: ScanMetrics,
     pub findings: Vec<RepositoryFinding>,
+    pub verified_credentials: Vec<VerifiedCredential>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

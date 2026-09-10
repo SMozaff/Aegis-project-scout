@@ -30,6 +30,7 @@ pub struct PatternMatch {
     pub excerpt: String,
     pub captured: String,
     pub absolute_endpoint: Option<String>,
+    pub verification: Option<crate::scanner::verify::VerifyOutcome>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

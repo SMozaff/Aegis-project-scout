@@ -12,7 +12,7 @@ use crate::{
     export,
     models::{
         AppSettings, ExportResult, RepositoryFinding, RepositorySummary, ScanConfig, ScanMetrics,
-        ScanProgress, ScanReport, TokenValidation,
+        ScanProgress, ScanReport, TokenValidation, VerifiedCredential,
     },
     scanner::{
         github::GithubScanner,
@@ -197,6 +197,7 @@ pub async fn run_scan(
     };
     let mut findings = Vec::with_capacity(repositories.len());
     let mut global_endpoints = HashSet::new();
+    let mut verified_credentials = Vec::new();
     let mut health_checked = 0usize;
     let mut blob_read_budget = MAX_BLOB_READS_PER_SCAN;
     let total = repositories.len().max(1);
@@ -263,6 +264,46 @@ pub async fn run_scan(
             }
         }
 
+        let auth_match_indices: Vec<usize> = matches
+            .iter()
+            .enumerate()
+            .filter(|(_, matched)| matched.category == "auth_token")
+            .map(|(match_index, _)| match_index)
+            .take(10)
+            .collect();
+        let verifier = ProviderVerifier::new();
+        let mut verified_count = 0u32;
+        for match_index in auth_match_indices {
+            let matched = &matches[match_index];
+            let provider = provider_for_pattern(&matched.pattern_name);
+            let outcome = match provider.as_deref() {
+                Some("openai") => verifier.verify_openai(&matched.captured).await?,
+                Some("anthropic") => verifier.verify_anthropic(&matched.captured).await?,
+                Some("github") => verifier.verify_github(&matched.captured).await?,
+                Some("aws") => verifier.verify_aws(&matched.captured, "").await?,
+                Some(provider) => VerifyOutcome::Unverifiable {
+                    reason: format!("Verification is not implemented for {provider} credentials."),
+                },
+                None => VerifyOutcome::Unverifiable {
+                    reason: "The credential provider could not be determined.".into(),
+                },
+            };
+            if matches!(outcome, VerifyOutcome::Valid { .. }) {
+                verified_count += 1;
+                if let Some(provider) = provider.clone() {
+                    verified_credentials.push(VerifiedCredential {
+                        provider,
+                        source_repo: repository.name.clone(),
+                        source_file: matches[match_index].file_path.clone(),
+                        line_number: matches[match_index].line_number as u32,
+                        pattern_name: matches[match_index].pattern_name.clone(),
+                        outcome: outcome.clone(),
+                    });
+                }
+            }
+            matches[match_index].verification = Some(outcome);
+        }
+
         let endpoints: Vec<String> = matches
             .iter()
             .filter_map(|matched| matched.absolute_endpoint.clone())
@@ -321,6 +362,7 @@ pub async fn run_scan(
             matches,
             health,
             warnings,
+            verified_count,
         };
         metrics.repositories_scanned += 1;
         metrics.files_scanned += finding.scanned_files;
@@ -329,7 +371,7 @@ pub async fn run_scan(
         findings.push(finding);
     }
 
-    metrics.unique_absolute_endpoints = global_endpoints.len();
+        metrics.unique_absolute_endpoints = global_endpoints.len();
     let completed_at = Utc::now();
     let report = ScanReport {
         generated_at: completed_at.to_rfc3339(),
@@ -338,6 +380,7 @@ pub async fn run_scan(
         settings,
         metrics,
         findings,
+        verified_credentials,
     };
     emit_progress(&app, "complete", "Scan complete.", total, total, None);
     Ok(report)
@@ -361,6 +404,36 @@ fn emit_progress(
             repository,
         },
     );
+}
+
+fn provider_for_pattern(pattern_name: &str) -> Option<String> {
+    let name = pattern_name.to_ascii_lowercase();
+    let provider = if name.starts_with("openai") {
+        "openai"
+    } else if name.starts_with("anthropic") {
+        "anthropic"
+    } else if name.starts_with("github") {
+        "github"
+    } else if name.starts_with("aws") {
+        "aws"
+    } else if name.starts_with("google") {
+        "google"
+    } else if name.starts_with("slack") {
+        "slack"
+    } else if name.starts_with("stripe") {
+        "stripe"
+    } else if name.starts_with("sendgrid") {
+        "sendgrid"
+    } else if name.starts_with("twilio") {
+        "twilio"
+    } else if name.starts_with("huggingface") {
+        "huggingface"
+    } else if name.starts_with("deepseek") {
+        "deepseek"
+    } else {
+        return None;
+    };
+    Some(provider.into())
 }
 
 struct ScanReset<'a>(&'a AtomicBool);

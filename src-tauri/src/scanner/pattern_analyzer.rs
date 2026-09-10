@@ -101,6 +101,7 @@ impl PatternAnalyzer {
                         excerpt,
                         captured,
                         absolute_endpoint,
+                        verification: None,
                     });
                 }
             }
