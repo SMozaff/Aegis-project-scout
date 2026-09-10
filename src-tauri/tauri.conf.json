@@ -29,6 +29,13 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.ico",
+      "icons/icon.icns"
+    ],
     "category": "DeveloperTool",
     "shortDescription": "Public repository API exposure and health monitoring",
     "longDescription": "Raven API Hunter monitors public GitHub repositories for API endpoint patterns and performs bounded, non-invasive HTTP responsiveness checks for security hygiene and compliance reporting."
