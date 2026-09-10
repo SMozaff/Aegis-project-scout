@@ -12,10 +12,15 @@ struct PatternDefinition {
     name: String,
     #[allow(dead_code)]
     description: String,
+    #[serde(default = "default_pattern_category")]
     category: String,
     confidence: String,
     regex: String,
     extract_group: usize,
+}
+
+fn default_pattern_category() -> String {
+    "endpoint".into()
 }
 
 struct CompiledPattern {
@@ -80,11 +85,17 @@ impl PatternAnalyzer {
                     let captured = redact_url_query(&normalized);
                     let excerpt = self.redact_excerpt(line);
 
+                    let confidence = if compiled.definition.category == "endpoint" {
+                        deprioritize_confidence(&compiled.definition.confidence)
+                    } else {
+                        compiled.definition.confidence.clone()
+                    };
+
                     matches.push(PatternMatch {
                         pattern_id: compiled.definition.id.clone(),
                         pattern_name: compiled.definition.name.clone(),
                         category: compiled.definition.category.clone(),
-                        confidence: compiled.definition.confidence.clone(),
+                        confidence,
                         file_path: file_path.to_string(),
                         line_number: line_index + 1,
                         excerpt,
@@ -117,6 +128,14 @@ fn trim_capture(value: &str) -> String {
         .trim_matches(|c: char| matches!(c, '\'' | '"' | '`' | ',' | ';'))
         .trim_end_matches(|c: char| matches!(c, ')' | ']' | '}'))
         .to_string()
+}
+
+fn deprioritize_confidence(confidence: &str) -> String {
+    match confidence {
+        "high" => "medium".into(),
+        "medium" => "low".into(),
+        _ => confidence.into(),
+    }
 }
 
 fn normalize_health_endpoint(value: &str) -> Option<String> {

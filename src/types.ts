@@ -26,7 +26,7 @@ export interface RepositorySummary {
 export interface PatternMatch {
   pattern_id: string;
   pattern_name: string;
-  category: string;
+  category: "endpoint" | "auth_token";
   confidence: Confidence;
   file_path: string;
   line_number: number;

@@ -2,11 +2,14 @@ use anyhow::{anyhow, Result};
 use base64::Engine;
 use reqwest::header::{HeaderMap, HeaderValue, ACCEPT, AUTHORIZATION, USER_AGENT};
 use serde::Deserialize;
+use std::collections::HashSet;
 use tokio::time::{sleep, Duration};
 
 use crate::models::project::ProjectDiscovery;
 
 const API: &str = "https://api.github.com";
+const RESULTS_PER_QUERY: usize = 30;
+const ENRICHMENT_LIMIT: usize = 20;
 
 #[derive(Clone)]
 pub struct GithubScanner {
@@ -14,8 +17,14 @@ pub struct GithubScanner {
 }
 
 #[derive(Deserialize)]
-struct SearchResult {
-    items: Vec<Repo>,
+struct CodeSearchResult {
+    #[serde(default)]
+    items: Vec<CodeSearchItem>,
+}
+
+#[derive(Deserialize)]
+struct CodeSearchItem {
+    repository: Repo,
 }
 
 #[derive(Deserialize)]
@@ -67,34 +76,84 @@ impl GithubScanner {
     pub async fn search_projects(
         &self,
         query: &str,
-        lookback: u32,
+        _lookback: u32,
     ) -> Result<Vec<ProjectDiscovery>> {
-        let mut out = Vec::new();
-        let date = chrono::Utc::now().date_naive() - chrono::Duration::days(lookback as i64);
-        let encoded =
-            url::form_urlencoded::byte_serialize(format!("{query} created:>{date}").as_bytes())
-                .collect::<String>();
-        for page in 1..=10 {
-            let result: SearchResult = self
-                .request(format!(
-                    "{API}/search/repositories?q={encoded}&page={page}&per_page=30"
-                ))
-                .await?
-                .json()
-                .await?;
-            if result.items.is_empty() {
-                break;
+        let technologies: Vec<&str> = query
+            .split(" OR ")
+            .map(str::trim)
+            .filter(|technology| !technology.is_empty())
+            .collect();
+        if technologies.is_empty() {
+            return Err(anyhow!("Select at least one technology to search for."));
+        }
+
+        let mut repositories = Vec::new();
+        let mut seen = HashSet::new();
+        for technology in technologies {
+            for search_query in [
+                format!("\"{technology}\" in:file filename:.env"),
+                format!("\"{technology}\" in:file filename:config"),
+                format!(
+                    "\"{technology}\" extension:yml OR extension:yaml OR extension:json token"
+                ),
+            ] {
+                let encoded = url::form_urlencoded::byte_serialize(search_query.as_bytes())
+                    .collect::<String>();
+                let mut collected = 0usize;
+
+                for page in 1..=10 {
+                    if collected >= RESULTS_PER_QUERY {
+                        break;
+                    }
+                    let result: CodeSearchResult = self
+                        .request(format!(
+                            "{API}/search/code?q={encoded}&page={page}&per_page={RESULTS_PER_QUERY}"
+                        ))
+                        .await?
+                        .json()
+                        .await?;
+                    if result.items.is_empty() {
+                        break;
+                    }
+
+                    for item in result.items {
+                        collected += 1;
+                        if seen.insert(item.repository.full_name.clone()) {
+                            repositories.push(item.repository);
+                        }
+                        if collected >= RESULTS_PER_QUERY {
+                            break;
+                        }
+                    }
+                }
             }
-            for repo in result.items {
-                out.push(self.to_discovery(repo).await?);
-            }
+        }
+
+        let mut out = Vec::with_capacity(repositories.len());
+        for (index, repo) in repositories.into_iter().enumerate() {
+            out.push(self.to_discovery(repo, index < ENRICHMENT_LIMIT).await?);
         }
         Ok(out)
     }
 
-    async fn to_discovery(&self, repo: Repo) -> Result<ProjectDiscovery> {
-        let readme = self.fetch_readme(&repo.owner.login, &repo.name).await.ok();
-        let text = readme.clone().unwrap_or_default().to_lowercase();
+    async fn to_discovery(&self, repo: Repo, enrich: bool) -> Result<ProjectDiscovery> {
+        let readme = if enrich {
+            self.fetch_readme(&repo.owner.login, &repo.name).await.ok()
+        } else {
+            None
+        };
+        let code_file = if enrich {
+            self.fetch_code_file(&repo.owner.login, &repo.name, "README.md")
+                .await
+                .ok()
+        } else {
+            None
+        };
+        let text = readme
+            .as_deref()
+            .or(code_file.as_deref())
+            .unwrap_or_default()
+            .to_lowercase();
         let mut terms = Vec::new();
         for term in [
             "api", "rest", "graphql", "openapi", "swagger", "endpoint", "webhook",
@@ -137,7 +196,7 @@ impl GithubScanner {
             endpoints: Vec::new(),
             health_status: None,
             confidence_score: if terms.is_empty() { 0.0 } else { 0.5 },
-            evidence: "Collected from public GitHub repository metadata".into(),
+            evidence: "Collected from public GitHub code-search results and repository metadata".into(),
             source_file: None,
         })
     }
