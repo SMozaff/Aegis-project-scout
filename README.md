@@ -1,4 +1,4 @@
-# Raven API Hunter
+# Raven Hunter
 
 Raven API Hunter is a Tauri v2 desktop application for developer security hygiene. It monitors **public GitHub repositories** for API endpoint and route patterns, performs bounded non-invasive responsiveness checks, presents project metrics in a React dashboard, and exports findings for compliance review.
 
