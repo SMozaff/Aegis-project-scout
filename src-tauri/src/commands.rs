@@ -14,7 +14,12 @@ use crate::{
         AppSettings, ExportResult, RepositoryFinding, RepositorySummary, ScanConfig, ScanMetrics,
         ScanProgress, ScanReport, TokenValidation,
     },
-    scanner::{github::GithubScanner, health_checker, pattern_analyzer::PatternAnalyzer},
+    scanner::{
+        github::GithubScanner,
+        health_checker,
+        pattern_analyzer::PatternAnalyzer,
+        verify::{ProviderVerifier, VerifyOutcome},
+    },
     utils::config,
     AppState,
 };
@@ -98,6 +103,34 @@ pub async fn validate_github_token(token: String) -> Result<TokenValidation, Str
         rate_limit_remaining: remaining,
         message: format!("Authenticated as {}", user.login),
     })
+}
+
+#[tauri::command]
+pub async fn verify_credential(
+    provider: String,
+    token: String,
+) -> Result<VerifyOutcome, String> {
+    if token.trim().is_empty() {
+        return Err("Credential token is required.".into());
+    }
+    if token.len() > 8_192 {
+        return Err("Credential token is unreasonably long.".into());
+    }
+
+    let verifier = ProviderVerifier::new();
+    let provider_name = provider.trim();
+    match provider_name.to_ascii_lowercase().as_str() {
+        "openai" => verifier.verify_openai(&token).await,
+        "anthropic" => verifier.verify_anthropic(&token).await,
+        "github" => verifier.verify_github(&token).await,
+        "aws" => verifier.verify_aws(&token, "").await,
+        _ if provider_name.starts_with("http://") || provider_name.starts_with("https://") => {
+            verifier.verify_generic(&token, provider_name).await
+        }
+        _ => Err(format!(
+            "Unsupported provider: {provider_name}. Use openai, anthropic, github, aws, or an HTTPS URL."
+        )),
+    }
 }
 
 #[tauri::command]

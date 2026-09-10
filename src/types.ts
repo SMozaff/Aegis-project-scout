@@ -86,6 +86,11 @@ export interface TokenValidation {
   message: string;
 }
 
+export type VerifyOutcome =
+  | { kind: "valid"; detail: string }
+  | { kind: "invalid"; detail: string }
+  | { kind: "unverifiable"; reason: string };
+
 export interface ExportResult {
   path: string;
   format: "json" | "csv";

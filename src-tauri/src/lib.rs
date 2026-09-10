@@ -25,6 +25,7 @@ pub fn run() {
             commands::load_settings,
             commands::save_settings,
             commands::validate_github_token,
+            commands::verify_credential,
             commands::run_scan,
             commands::export_report,
         ])

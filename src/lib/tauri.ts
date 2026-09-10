@@ -5,6 +5,7 @@ import type {
   ScanConfig,
   ScanReport,
   TokenValidation,
+  VerifyOutcome,
 } from "../types";
 
 export const api = {
@@ -13,6 +14,8 @@ export const api = {
     invoke<AppSettings>("save_settings", { settings }),
   validateGithubToken: (token: string) =>
     invoke<TokenValidation>("validate_github_token", { token }),
+  verifyCredential: (provider: string, token: string) =>
+    invoke<VerifyOutcome>("verify_credential", { provider, token }),
   runScan: (config: ScanConfig) => invoke<ScanReport>("run_scan", { config }),
   exportReport: (report: ScanReport, format: "json" | "csv") =>
     invoke<ExportResult>("export_report", { report, format }),
