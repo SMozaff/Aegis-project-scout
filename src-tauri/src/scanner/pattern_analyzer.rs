@@ -28,7 +28,7 @@ struct CompiledPattern {
     regex: Regex,
 }
 
-pub struct PatternAnalyzer {
+pub(crate) struct PatternAnalyzer {
     patterns: Vec<CompiledPattern>,
     secret_assignment: Regex,
     authorization_value: Regex,
@@ -41,7 +41,7 @@ pub(crate) struct RawPatternMatch {
 }
 
 impl PatternAnalyzer {
-    pub fn load_default() -> Result<Self, String> {
+    pub(crate) fn load_default() -> Result<Self, String> {
         let definitions: Vec<PatternDefinition> = serde_json::from_str(DEFAULT_PATTERNS)
             .map_err(|e| format!("Default pattern file is invalid: {e}"))?;
 
@@ -68,7 +68,7 @@ impl PatternAnalyzer {
         })
     }
 
-    pub fn analyze(&self, file_path: &str, content: &str) -> Vec<RawPatternMatch> {
+    pub(crate) fn analyze(&self, file_path: &str, content: &str) -> Vec<RawPatternMatch> {
         let mut matches = Vec::new();
 
         for (line_index, line) in content.lines().enumerate() {

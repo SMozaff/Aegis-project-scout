@@ -1,7 +1,8 @@
-mod commands;
+pub mod commands;
 mod export;
-mod models;
-mod scanner;
+pub mod models;
+pub mod scan_headless;
+pub mod scanner;
 mod utils;
 
 use std::sync::atomic::AtomicBool;
