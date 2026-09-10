@@ -30,5 +30,5 @@ pub fn run() {
             commands::export_report,
         ])
         .run(tauri::generate_context!())
-        .expect("error while running Aegis Project Scout");
+        .expect("error while running Raven API Hunter");
 }

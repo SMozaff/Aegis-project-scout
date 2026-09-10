@@ -4,12 +4,10 @@ import type { AppSettings, ScanProgress } from "../types";
 interface ScannerConfigProps {
   settings: AppSettings;
   onChange: (settings: AppSettings) => void;
-  onRun: () => Promise<void>;
+  onRun: (verifyCredentials: boolean) => Promise<void>;
   running: boolean;
   progress: ScanProgress | null;
   tokenConfigured: boolean;
-  verifyCredentials: boolean;
-  onVerifyCredentialsChange: (enabled: boolean) => void;
 }
 
 const languageOptions = ["TypeScript", "JavaScript", "Python", "Go", "Rust", "Java", "Ruby", "PHP"];
@@ -21,10 +19,9 @@ export function ScannerConfig({
   running,
   progress,
   tokenConfigured,
-  verifyCredentials,
-  onVerifyCredentialsChange,
 }: ScannerConfigProps) {
   const [webSearch, setWebSearch] = useState(false);
+  const [verifyCredentials, setVerifyCredentials] = useState(true);
 
   const update = (changes: Partial<AppSettings>) => onChange({ ...settings, ...changes });
   const toggleLanguage = (language: string) => {
@@ -121,7 +118,7 @@ export function ScannerConfig({
               <input
                 type="checkbox"
                 checked={verifyCredentials}
-                onChange={(event) => onVerifyCredentialsChange(event.target.checked)}
+                onChange={(event) => setVerifyCredentials(event.target.checked)}
                 className="accent-sky-500"
               />
               Verify credentials (may consume provider API quota)
@@ -137,7 +134,7 @@ export function ScannerConfig({
             {tokenConfigured ? "Authenticated GitHub access configured." : "Using anonymous GitHub access."}
           </div>
         </div>
-        <button type="button" className="button-primary min-w-32" disabled={running} onClick={() => void onRun()}>
+        <button type="button" className="button-primary min-w-32" disabled={running} onClick={() => void onRun(verifyCredentials)}>
           {running ? "Scanning…" : "Run Scan"}
         </button>
       </div>

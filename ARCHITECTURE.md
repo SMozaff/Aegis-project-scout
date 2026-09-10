@@ -1,4 +1,4 @@
-# Aegis Project Scout Architecture
+# Raven API Hunter Architecture
 
 ## Data flow
 
@@ -21,7 +21,7 @@ Rust command layer
       ▼
 React Results / Dashboard
       │
-      └── export_report → JSON or CSV in Documents/Aegis Project Scout/exports
+      └── export_report → JSON or CSV in Documents/Raven API Hunter/exports
 ```
 
 ## Trust boundaries

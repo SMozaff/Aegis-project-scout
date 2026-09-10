@@ -6,7 +6,7 @@ use std::{fs, path::PathBuf};
 
 use crate::models::Pattern;
 
-const SERVICE: &str = "aegis-project-scout";
+const SERVICE: &str = "raven-api-hunter";
 const TOKEN_KEY: &str = "github-token";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -34,7 +34,7 @@ fn config_path() -> Result<PathBuf> {
     Ok(home_dir()
         .context("home directory unavailable")?
         .join(".config")
-        .join("aegis-project-scout")
+        .join("raven-api-hunter")
         .join("config.json"))
 }
 

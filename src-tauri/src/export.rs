@@ -17,7 +17,7 @@ pub fn export(app: &AppHandle, report: &ScanReport, format: &str) -> Result<Expo
         .map_err(|e| format!("Unable to create export directory: {e}"))?;
 
     let stamp = Utc::now().format("%Y%m%d-%H%M%S");
-    let path = directory.join(format!("aegis-scan-{stamp}.{format}"));
+    let path = directory.join(format!("raven-scan-{stamp}.{format}"));
 
     match format.as_str() {
         "json" => {
@@ -37,7 +37,7 @@ pub fn export(app: &AppHandle, report: &ScanReport, format: &str) -> Result<Expo
 
 fn export_directory(app: &AppHandle) -> Result<PathBuf, String> {
     if let Ok(documents) = app.path().document_dir() {
-        return Ok(documents.join("Aegis Project Scout").join("exports"));
+        return Ok(documents.join("Raven API Hunter").join("exports"));
     }
     app.path()
         .app_data_dir()
@@ -256,7 +256,7 @@ mod tests {
         assert_eq!(value["verified_credentials"][1]["outcome"]["kind"], "unverifiable");
 
         let filename = format!(
-            "aegis-export-test-{}.csv",
+            "raven-export-test-{}.csv",
             SystemTime::now()
                 .duration_since(UNIX_EPOCH)
                 .unwrap()

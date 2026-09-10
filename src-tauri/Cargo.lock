@@ -9,26 +9,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "320119579fcad9c21884f5c4861d16174d0e06250625266f50fe6898340abefa"
 
 [[package]]
-name = "aegis-project-scout"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "base64 0.22.1",
- "chrono",
- "csv",
- "dirs 5.0.1",
- "keyring",
- "regex",
- "reqwest 0.12.28",
- "serde",
- "serde_json",
- "tauri",
- "tauri-build",
- "tokio",
- "url",
-]
-
-[[package]]
 name = "aho-corasick"
 version = "1.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2679,6 +2659,26 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "caa0f4137e1c0a72f4c651489402276c8e8e1cf081f3b0ba156d2cbeef09e86a"
 dependencies = [
  "rand_core",
+]
+
+[[package]]
+name = "raven-api-hunter"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "base64 0.22.1",
+ "chrono",
+ "csv",
+ "dirs 5.0.1",
+ "keyring",
+ "regex",
+ "reqwest 0.12.28",
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-build",
+ "tokio",
+ "url",
 ]
 
 [[package]]

@@ -34,7 +34,6 @@ function App() {
   const [tab, setTab] = useState<Tab>("dashboard");
   const [settings, setSettings] = useState<AppSettings>(fallbackSettings);
   const [token, setToken] = useState("");
-  const [verifyCredentials, setVerifyCredentials] = useState(true);
   const [report, setReport] = useState<ScanReport | null>(null);
   const [liveFindings, setLiveFindings] = useState<RepositoryFinding[]>([]);
   const [progress, setProgress] = useState<ScanProgress | null>(null);
@@ -77,7 +76,7 @@ function App() {
 
   const tokenConfigured = useMemo(() => token.trim().length > 0, [token]);
 
-  const runScan = async () => {
+  const runScan = async (verifyCredentials: boolean) => {
     setRunning(true);
     setError(null);
     setExportMessage(null);
@@ -134,7 +133,7 @@ function App() {
         <div className="flex items-center gap-3 px-2">
           <div className="grid h-10 w-10 place-items-center rounded-xl border border-sky-500/30 bg-sky-500/10 text-sm font-black text-sky-300">A</div>
           <div>
-            <div className="font-semibold text-white">Aegis Project Scout</div>
+            <div className="font-semibold text-white">Raven API Hunter</div>
             <div className="mt-0.5 text-[11px] uppercase tracking-[0.16em] text-slate-500">Public repo hygiene</div>
           </div>
         </div>
@@ -184,8 +183,6 @@ function App() {
               running={running}
               progress={progress}
               tokenConfigured={tokenConfigured}
-              verifyCredentials={verifyCredentials}
-              onVerifyCredentialsChange={setVerifyCredentials}
             />
           )}
           {tab === "results" && (

@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Aegis Project Scout",
+  "productName": "Raven API Hunter",
   "version": "0.1.0",
-  "identifier": "com.aegis.projectscout",
+  "identifier": "com.smozaff.raven-api-hunter",
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://127.0.0.1:1420",
@@ -13,7 +13,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "Aegis Project Scout",
+        "title": "Raven API Hunter",
         "width": 1400,
         "height": 900,
         "minWidth": 1000,
@@ -31,6 +31,6 @@
     "targets": "all",
     "category": "DeveloperTool",
     "shortDescription": "Public repository API exposure and health monitoring",
-    "longDescription": "Aegis Project Scout monitors public GitHub repositories for API endpoint patterns and performs bounded, non-invasive HTTP responsiveness checks for security hygiene and compliance reporting."
+    "longDescription": "Raven API Hunter monitors public GitHub repositories for API endpoint patterns and performs bounded, non-invasive HTTP responsiveness checks for security hygiene and compliance reporting."
   }
 }

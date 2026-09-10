@@ -45,7 +45,7 @@ export function Settings({ settings, token, onTokenChange, onSave, onValidate }:
         <div className="label">Settings</div>
         <h1 className="mt-2 text-3xl font-semibold text-white">GitHub and application settings</h1>
         <p className="mt-2 text-sm leading-6 text-slate-400">
-          The token is kept in frontend memory for the current app session. It is not written to the Aegis settings JSON file or exported reports.
+          The token is kept in frontend memory for the current app session. It is not written to the Raven API Hunter settings JSON file or exported reports.
         </p>
       </div>
 
@@ -100,7 +100,7 @@ export function Settings({ settings, token, onTokenChange, onSave, onValidate }:
       <div className="panel p-6">
         <div className="font-semibold text-slate-100">Recommended GitHub token scope</div>
         <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-400">
-          For public repository monitoring, use the least privilege available. Aegis only performs read operations against repository metadata, Git trees/blobs, and the authenticated user endpoint used for token validation. It does not create issues, commits, webhooks, branches, or repository changes.
+          For public repository monitoring, use the least privilege available. Raven API Hunter only performs read operations against repository metadata, Git trees/blobs, and the authenticated user endpoint used for token validation. It does not create issues, commits, webhooks, branches, or repository changes.
         </p>
       </div>
     </div>

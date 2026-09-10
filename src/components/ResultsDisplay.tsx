@@ -84,6 +84,12 @@ export function ResultsDisplay({
         ))}
       </div>
 
+      <div className="flex items-center justify-between gap-4">
+        <div className="rounded-full border border-sky-500/20 bg-sky-500/10 px-3 py-1 text-xs font-medium text-sky-200">
+          Verified credentials: {report?.verified_credentials.length ?? 0}
+        </div>
+      </div>
+
       <div className="panel overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[760px] text-left text-sm">
@@ -131,7 +137,7 @@ export function ResultsDisplay({
                         {finding.matches.some((match) => match.verification?.kind === "valid")
                           ? "✓"
                           : finding.matches.some((match) => match.verification?.kind === "invalid")
-                            ? "✕"
+                            ? "✗"
                             : "—"}
                       </td>
                     </tr>

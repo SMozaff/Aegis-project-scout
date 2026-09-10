@@ -70,12 +70,12 @@ pub async fn validate_github_token(token: String) -> Result<TokenValidation, Str
     }
 
     let client = reqwest::Client::builder()
-        .user_agent("Aegis-Project-Scout")
+        .user_agent("Raven-API-Hunter")
         .build()
         .map_err(|error| error.to_string())?;
     let response = client
         .get("https://api.github.com/user")
-        .header(USER_AGENT, "Aegis-Project-Scout")
+        .header(USER_AGENT, "Raven-API-Hunter")
         .header(ACCEPT, "application/vnd.github+json")
         .header(AUTHORIZATION, format!("Bearer {token}"))
         .send()

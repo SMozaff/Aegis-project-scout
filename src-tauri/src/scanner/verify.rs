@@ -49,7 +49,7 @@ impl ProviderVerifier {
             .client
             .get("https://api.github.com/user")
             .header("Authorization", format!("token {token}"))
-            .header("User-Agent", "Aegis-Project-Scout")
+            .header("User-Agent", "Raven-API-Hunter")
             .send()
             .await
             .map_err(|error| error.to_string())?;

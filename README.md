@@ -1,20 +1,20 @@
-# Aegis Project Scout
+# Raven API Hunter
 
-Aegis Project Scout is a Tauri v2 desktop application for developer security hygiene. It monitors **public GitHub repositories** for API endpoint and route patterns, performs bounded non-invasive responsiveness checks, presents project metrics in a React dashboard, and exports findings for compliance review.
+Raven API Hunter is a Tauri v2 desktop application for developer security hygiene. It monitors **public GitHub repositories** for API endpoint and route patterns, performs bounded non-invasive responsiveness checks, presents project metrics in a React dashboard, and exports findings for compliance review.
 
 ## Scope and safety model
 
-Aegis is intentionally read-only and bounded:
+Raven is intentionally read-only and bounded:
 
 - Repository discovery uses GitHub's public repository search and Git tree/blob APIs.
 - It does not create commits, issues, branches, webhooks, pull requests, or repository changes.
 - The default analyzer looks for endpoint/API patterns only; it does not hunt for credentials.
 - HTTP health checks use `HEAD` only, do not follow redirects, remove URL query strings, and reject localhost, private, link-local, multicast, and common reserved/special-purpose network targets.
 - Health checks are capped at 8 endpoints per repository and 30 endpoints per scan.
-- GitHub tokens are not persisted in Aegis settings and are never placed in exported reports.
+- GitHub tokens are not persisted in Raven settings and are never placed in exported reports.
 - Candidate source/config files are capped by file size and by a configurable files-per-repository limit.
 
-Use Aegis only for repositories and endpoint monitoring activities that you are authorized to perform.
+Use Raven only for repositories and endpoint monitoring activities that you are authorized to perform.
 
 ## Stack
 
@@ -28,7 +28,7 @@ Use Aegis only for repositories and endpoint monitoring activities that you are 
 ## Project structure
 
 ```text
-Aegis-Project-Scout/
+Raven-API-Hunter/
 ├── src/
 │   ├── components/
 │   │   ├── Dashboard.tsx
@@ -106,7 +106,7 @@ Tauri will produce platform-appropriate bundles under `src-tauri/target/release/
 
 Open **Settings** and paste a GitHub OAuth/PAT access token. The token is held in memory for the application session and sent as an `Authorization: Bearer ...` header to GitHub.
 
-Aegis also supports the `GH_TOKEN` environment variable as a backend fallback:
+Raven also supports the `GH_TOKEN` environment variable as a backend fallback:
 
 ```bash
 export GH_TOKEN="your-token"
@@ -120,7 +120,7 @@ $env:GH_TOKEN="your-token"
 npm run tauri dev
 ```
 
-For public repository monitoring, use the least privilege available. Aegis only needs read access to public repository metadata/content plus the authenticated-user endpoint if you use the **Validate token** button.
+For public repository monitoring, use the least privilege available. Raven only needs read access to public repository metadata/content plus the authenticated-user endpoint if you use the **Validate token** button.
 
 ## Running a scan
 
@@ -136,7 +136,7 @@ Results stream into the **Results** view as each repository completes. The dashb
 
 ### Discovery behavior
 
-For each selected language, Aegis searches for recently pushed public, non-archived, non-fork repositories. It then requests the repository's recursive Git tree and prioritizes likely API/configuration files, including names containing terms such as:
+For each selected language, Raven searches for recently pushed public, non-archived, non-fork repositories. It then requests the repository's recursive Git tree and prioritizes likely API/configuration files, including names containing terms such as:
 
 - `openapi`
 - `swagger`
@@ -174,7 +174,7 @@ Each definition includes an ID, category, confidence level, regex, and capture g
 
 ## Health checking
 
-Only absolute HTTP(S) endpoints can be checked. Before a request, Aegis:
+Only absolute HTTP(S) endpoints can be checked. Before a request, Raven:
 
 1. Parses and normalizes the URL.
 2. Removes query strings and fragments from the health-check target.
@@ -194,10 +194,10 @@ After a completed scan, use **Export JSON** or **Export CSV** in the Results scr
 Exports are written to:
 
 ```text
-Documents/Aegis Project Scout/exports/
+Documents/Raven API Hunter/exports/
 ```
 
-If a Documents directory is unavailable, Aegis falls back to its application data directory.
+If a Documents directory is unavailable, Raven falls back to its application data directory.
 
 CSV output is sanitized to reduce spreadsheet formula-injection risk. Reports include repository metadata, pattern evidence, health status, and warnings. They do not contain the GitHub token.
 
@@ -240,12 +240,12 @@ To add another endpoint pattern, append a JSON entry to `default_patterns.json`:
 }
 ```
 
-Keep new rules focused on endpoint/API exposure and avoid credential/secret collection if you want to preserve Aegis's intended security-hygiene scope.
+Keep new rules focused on endpoint/API exposure and avoid credential/secret collection if you want to preserve Raven's intended security-hygiene scope.
 
 ## Known operational limits
 
 - Repository search is sampling-based rather than an exhaustive GitHub-wide crawl.
-- Recursive Git trees can be truncated by GitHub for extremely large repositories; Aegis surfaces a warning when that occurs.
+- Recursive Git trees can be truncated by GitHub for extremely large repositories; Raven surfaces a warning when that occurs.
 - The scanner prioritizes likely API/configuration files rather than downloading every file in every repository.
 - A responsive endpoint is not necessarily healthy, vulnerable, or intended for public use; findings require human review.
 - A pattern match is evidence of a source-code pattern, not proof of a security issue.

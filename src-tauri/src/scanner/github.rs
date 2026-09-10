@@ -55,7 +55,7 @@ struct Content {
 impl GithubScanner {
     pub fn new(token: Option<String>) -> Result<Self> {
         let mut headers = HeaderMap::new();
-        headers.insert(USER_AGENT, HeaderValue::from_static("Aegis-Project-Scout"));
+        headers.insert(USER_AGENT, HeaderValue::from_static("Raven-API-Hunter"));
         headers.insert(
             ACCEPT,
             HeaderValue::from_static("application/vnd.github+json"),
