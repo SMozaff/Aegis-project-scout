@@ -54,7 +54,7 @@ jobs:
       - name: Install npm deps
         run: npm ci
 
-      - name: Frontend type-check + build
+      - name: Frontend build
         run: npm run build
 
       - name: Rust fmt check
@@ -63,7 +63,7 @@ jobs:
 
       - name: Rust clippy
         working-directory: src-tauri
-        run: cargo clippy --all-targets
+        run: cargo clippy --all-targets -- -D warnings
 
       - name: Rust test
         working-directory: src-tauri
@@ -127,59 +127,20 @@ jobs:
       - name: Install npm deps
         run: npm ci
 
-      - name: Build frontend
-        run: npm run build
-
       - name: Build Tauri app
-        working-directory: src-tauri
-        run: cargo build --release --target ${{ matrix.target }}
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          args: --target ${{ matrix.target }}
 
-      - name: Bundle Tauri app (Linux/macOS)
-        if: matrix.platform != 'windows-latest'
-        working-directory: src-tauri
-        run: |
-          cargo install tauri-cli --version "^2" --locked
-          cargo tauri build --target ${{ matrix.target }} --no-bundle || true
-
-      - name: Bundle Tauri app (Windows)
-        if: matrix.platform == 'windows-latest'
-        working-directory: src-tauri
-        run: |
-          cargo install tauri-cli --version "^2" --locked
-          cargo tauri build --target ${{ matrix.target }}
-
-      - name: Prepare artifact staging (Linux)
-        if: matrix.platform == 'ubuntu-22.04'
-        run: |
-          mkdir -p staging
-          cp src-tauri/target/${{ matrix.target }}/release/aegis-project-scout staging/ 2>/dev/null || \
-            cp src-tauri/target/release/aegis-project-scout staging/ 2>/dev/null || true
-          cp -r src-tauri/target/${{ matrix.target }}/release/bundle/* staging/ 2>/dev/null || \
-            cp -r src-tauri/target/release/bundle/* staging/ 2>/dev/null || true
-
-      - name: Prepare artifact staging (Windows)
-        if: matrix.platform == 'windows-latest'
-        shell: pwsh
-        run: |
-          New-Item -ItemType Directory -Force -Path staging | Out-Null
-          Copy-Item src-tauri/target/${{ matrix.target }}/release/aegis-project-scout.exe staging/ -ErrorAction SilentlyContinue
-          if (Test-Path src-tauri/target/${{ matrix.target }}/release/bundle) {
-            Copy-Item -Recurse src-tauri/target/${{ matrix.target }}/release/bundle/* staging/
-          }
-
-      - name: Prepare artifact staging (macOS)
-        if: startsWith(matrix.platform, 'macos')
-        run: |
-          mkdir -p staging
-          cp src-tauri/target/${{ matrix.target }}/release/aegis-project-scout staging/ 2>/dev/null || true
-          if [ -d "src-tauri/target/${{ matrix.target }}/release/bundle" ]; then
-            cp -r src-tauri/target/${{ matrix.target }}/release/bundle/* staging/
-          fi
-
-      - name: Upload artifact
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: aegis-project-scout-${{ matrix.artifact_name }}
-          path: staging/
+          path: |
+            src-tauri/target/${{ matrix.target }}/release/bundle/**
+            src-tauri/target/${{ matrix.target }}/release/*.exe
+            src-tauri/target/${{ matrix.target }}/release/aegis-project-scout
           retention-days: 14
           if-no-files-found: warn
