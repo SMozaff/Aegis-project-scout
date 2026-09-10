@@ -1,4 +1,7 @@
-use std::{collections::HashSet, sync::atomic::{AtomicBool, Ordering}};
+use std::{
+    collections::HashSet,
+    sync::atomic::{AtomicBool, Ordering},
+};
 
 use chrono::Utc;
 use reqwest::header::{ACCEPT, AUTHORIZATION, USER_AGENT};
@@ -7,7 +10,10 @@ use tauri::{AppHandle, Emitter, State};
 
 use crate::{
     export,
-    models::{AppSettings, ExportResult, RepositoryFinding, RepositorySummary, ScanConfig, ScanMetrics, ScanProgress, ScanReport, TokenValidation},
+    models::{
+        AppSettings, ExportResult, RepositoryFinding, RepositorySummary, ScanConfig, ScanMetrics,
+        ScanProgress, ScanReport, TokenValidation,
+    },
     scanner::{github::GithubScanner, health_checker, pattern_analyzer::PatternAnalyzer},
     utils::config,
     AppState,
@@ -54,7 +60,9 @@ pub async fn validate_github_token(token: String) -> Result<TokenValidation, Str
     }
 
     #[derive(Deserialize)]
-    struct GithubUser { login: String }
+    struct GithubUser {
+        login: String,
+    }
 
     let client = reqwest::Client::builder()
         .user_agent("Aegis-Project-Scout")
@@ -93,20 +101,35 @@ pub async fn validate_github_token(token: String) -> Result<TokenValidation, Str
 }
 
 #[tauri::command]
-pub fn export_report(app: AppHandle, report: ScanReport, format: String) -> Result<ExportResult, String> {
+pub fn export_report(
+    app: AppHandle,
+    report: ScanReport,
+    format: String,
+) -> Result<ExportResult, String> {
     export::export(&app, &report, &format)
 }
 
 #[tauri::command]
-pub async fn run_scan(app: AppHandle, state: State<'_, AppState>, config: ScanConfig) -> Result<ScanReport, String> {
+pub async fn run_scan(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    config: ScanConfig,
+) -> Result<ScanReport, String> {
     let settings = config.settings();
     if settings.languages.is_empty() {
         return Err("Select at least one language or technology.".into());
     }
-    if settings.lookback_days == 0 || settings.max_repositories == 0 || settings.max_files_per_repository == 0 {
+    if settings.lookback_days == 0
+        || settings.max_repositories == 0
+        || settings.max_files_per_repository == 0
+    {
         return Err("Scan limits must be greater than zero.".into());
     }
-    if config.github_token.as_ref().is_some_and(|token| token.len() > 8_192) {
+    if config
+        .github_token
+        .as_ref()
+        .is_some_and(|token| token.len() > 8_192)
+    {
         return Err("GitHub token is unreasonably long.".into());
     }
 
@@ -116,9 +139,17 @@ pub async fn run_scan(app: AppHandle, state: State<'_, AppState>, config: ScanCo
     let _reset = ScanReset(&state.scanning);
     let started_at = Utc::now();
 
-    emit_progress(&app, "discovering", "Discovering recently active public repositories…", 0, 1, None);
+    emit_progress(
+        &app,
+        "discovering",
+        "Discovering recently active public repositories…",
+        0,
+        1,
+        None,
+    );
 
-    let github = GithubScanner::new(config.github_token.clone()).map_err(|error| error.to_string())?;
+    let github =
+        GithubScanner::new(config.github_token.clone()).map_err(|error| error.to_string())?;
     let analyzer = PatternAnalyzer::load_default()?;
     let query = settings.languages.join(" OR ");
     let mut repositories = github
@@ -139,16 +170,41 @@ pub async fn run_scan(app: AppHandle, state: State<'_, AppState>, config: ScanCo
 
     for (index, repository) in repositories.into_iter().enumerate() {
         let repository_name = repository.name.clone();
-        emit_progress(&app, "repository", &format!("Scanning {repository_name}"), index, total, Some(repository_name.clone()));
+        emit_progress(
+            &app,
+            "repository",
+            &format!("Scanning {repository_name}"),
+            index,
+            total,
+            Some(repository_name.clone()),
+        );
 
-        let (owner, repo) = repository.repository_url
+        let (owner, repo) = repository
+            .repository_url
             .trim_end_matches('/')
             .rsplit_once("/repos/")
             .map(|(owner, repo)| (owner.to_string(), repo.to_string()))
-            .or_else(|| repository.repository_url.trim_end_matches('/').rsplit_once('/').map(|(owner, repo)| (owner.rsplit('/').next().unwrap_or(owner).to_string(), repo.to_string())))
-            .ok_or_else(|| format!("Unable to determine owner/repository for {}", repository.name))?;
+            .or_else(|| {
+                repository
+                    .repository_url
+                    .trim_end_matches('/')
+                    .rsplit_once('/')
+                    .map(|(owner, repo)| {
+                        (
+                            owner.rsplit('/').next().unwrap_or(owner).to_string(),
+                            repo.to_string(),
+                        )
+                    })
+            })
+            .ok_or_else(|| {
+                format!(
+                    "Unable to determine owner/repository for {}",
+                    repository.name
+                )
+            })?;
 
-        let allocated_file_reads = (settings.max_files_per_repository as usize).min(blob_read_budget);
+        let allocated_file_reads =
+            (settings.max_files_per_repository as usize).min(blob_read_budget);
         blob_read_budget = blob_read_budget.saturating_sub(allocated_file_reads);
         let mut matches = Vec::new();
         let mut scanned_files = 0usize;
@@ -174,21 +230,43 @@ pub async fn run_scan(app: AppHandle, state: State<'_, AppState>, config: ScanCo
             }
         }
 
-        let endpoints: Vec<String> = matches.iter().filter_map(|matched| matched.absolute_endpoint.clone()).collect::<HashSet<_>>().into_iter().collect();
+        let endpoints: Vec<String> = matches
+            .iter()
+            .filter_map(|matched| matched.absolute_endpoint.clone())
+            .collect::<HashSet<_>>()
+            .into_iter()
+            .collect();
         global_endpoints.extend(endpoints.iter().cloned());
         let mut health = Vec::new();
         if settings.health_check && health_checked < MAX_HEALTH_PER_SCAN {
-            for endpoint in endpoints.into_iter().take(MAX_HEALTH_PER_REPOSITORY).take(MAX_HEALTH_PER_SCAN - health_checked) {
-                emit_progress(&app, "health", &format!("Checking public endpoint from {repository_name}"), index, total, Some(repository_name.clone()));
+            for endpoint in endpoints
+                .into_iter()
+                .take(MAX_HEALTH_PER_REPOSITORY)
+                .take(MAX_HEALTH_PER_SCAN - health_checked)
+            {
+                emit_progress(
+                    &app,
+                    "health",
+                    &format!("Checking public endpoint from {repository_name}"),
+                    index,
+                    total,
+                    Some(repository_name.clone()),
+                );
                 if let Some(result) = health_checker::check_health(&endpoint).await {
-                    if result.is_healthy { metrics.reachable_endpoints += 1; }
+                    if result.is_healthy {
+                        metrics.reachable_endpoints += 1;
+                    }
                     health.push(crate::models::endpoint::EndpointHealth {
                         endpoint: result.endpoint,
                         reachable: result.is_healthy,
                         blocked: false,
                         status_code: result.status_code,
                         latency_ms: result.response_time_ms,
-                        reason: if result.is_healthy { None } else { Some("Endpoint did not return a successful response.".into()) },
+                        reason: if result.is_healthy {
+                            None
+                        } else {
+                            Some("Endpoint did not return a successful response.".into())
+                        },
                     });
                 }
                 health_checked += 1;
@@ -232,11 +310,29 @@ pub async fn run_scan(app: AppHandle, state: State<'_, AppState>, config: ScanCo
     Ok(report)
 }
 
-fn emit_progress(app: &AppHandle, stage: &str, message: &str, completed: usize, total: usize, repository: Option<String>) {
-    let _ = app.emit("scan://progress", ScanProgress { stage: stage.to_string(), message: message.to_string(), completed, total, repository });
+fn emit_progress(
+    app: &AppHandle,
+    stage: &str,
+    message: &str,
+    completed: usize,
+    total: usize,
+    repository: Option<String>,
+) {
+    let _ = app.emit(
+        "scan://progress",
+        ScanProgress {
+            stage: stage.to_string(),
+            message: message.to_string(),
+            completed,
+            total,
+            repository,
+        },
+    );
 }
 
 struct ScanReset<'a>(&'a AtomicBool);
 impl Drop for ScanReset<'_> {
-    fn drop(&mut self) { self.0.store(false, Ordering::SeqCst); }
+    fn drop(&mut self) {
+        self.0.store(false, Ordering::SeqCst);
+    }
 }

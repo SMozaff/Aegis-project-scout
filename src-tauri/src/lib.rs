@@ -1,8 +1,8 @@
 mod commands;
-mod utils;
 mod export;
 mod models;
 mod scanner;
+mod utils;
 
 use std::sync::atomic::AtomicBool;
 

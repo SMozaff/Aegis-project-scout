@@ -1,7 +1,6 @@
-
+use super::endpoint::ApiEndpoint;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use super::endpoint::ApiEndpoint;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProjectDiscovery {

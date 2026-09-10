@@ -45,8 +45,8 @@ fn export_directory(app: &AppHandle) -> Result<PathBuf, String> {
 }
 
 fn write_csv(path: &PathBuf, report: &ScanReport) -> Result<(), String> {
-    let mut writer = csv::Writer::from_path(path)
-        .map_err(|e| format!("Unable to create CSV report: {e}"))?;
+    let mut writer =
+        csv::Writer::from_path(path).map_err(|e| format!("Unable to create CSV report: {e}"))?;
 
     writer
         .write_record([
