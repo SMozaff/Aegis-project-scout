@@ -4,7 +4,7 @@ import type { AppSettings, ScanProgress } from "../types";
 interface ScannerConfigProps {
   settings: AppSettings;
   onChange: (settings: AppSettings) => void;
-  onRun: (verifyCredentials: boolean) => Promise<void>;
+  onRun: (options: { health_check: boolean; verify_credentials: boolean }) => Promise<void>;
   running: boolean;
   progress: ScanProgress | null;
   tokenConfigured: boolean;
@@ -134,7 +134,12 @@ export function ScannerConfig({
             {tokenConfigured ? "Authenticated GitHub access configured." : "Using anonymous GitHub access."}
           </div>
         </div>
-        <button type="button" className="button-primary min-w-32" disabled={running} onClick={() => void onRun(verifyCredentials)}>
+        <button
+          type="button"
+          className="button-primary min-w-32"
+          disabled={running}
+          onClick={() => void onRun({ health_check: settings.health_check, verify_credentials: verifyCredentials })}
+        >
           {running ? "Scanning…" : "Run Scan"}
         </button>
       </div>

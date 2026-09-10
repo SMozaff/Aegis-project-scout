@@ -31,11 +31,13 @@ impl Default for AppSettings {
 pub struct ScanConfig {
     #[serde(default)]
     pub github_token: Option<String>,
+    /// Credential verification is enabled for clients that omit this field.
     #[serde(default = "default_true")]
     pub verify_credentials: bool,
     pub languages: Vec<String>,
     pub lookback_days: u16,
     pub max_repositories: u16,
+    /// Endpoint health checks are enabled for clients that omit this field.
     #[serde(default = "default_true")]
     pub health_check: bool,
     pub max_files_per_repository: u16,

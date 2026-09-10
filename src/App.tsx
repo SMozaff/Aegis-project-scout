@@ -76,7 +76,7 @@ function App() {
 
   const tokenConfigured = useMemo(() => token.trim().length > 0, [token]);
 
-  const runScan = async (verifyCredentials: boolean) => {
+  const runScan = async (options: { health_check: boolean; verify_credentials: boolean }) => {
     setRunning(true);
     setError(null);
     setExportMessage(null);
@@ -94,7 +94,7 @@ function App() {
       const next = await api.runScan({
         ...settings,
         github_token: token.trim() || null,
-        verify_credentials: verifyCredentials,
+        ...options,
       });
       setReport(next);
     } catch (scanError) {

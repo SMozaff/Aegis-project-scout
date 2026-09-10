@@ -35,20 +35,27 @@ struct CodeSearchItem {
 
 #[derive(Deserialize)]
 struct Repo {
+    #[serde(default)]
     name: String,
+    #[serde(default)]
     full_name: String,
+    #[serde(default)]
     html_url: String,
     description: Option<String>,
+    #[serde(default)]
     stargazers_count: u64,
+    #[serde(default)]
     forks_count: u64,
     language: Option<String>,
     #[serde(default)]
     topics: Vec<String>,
+    #[serde(default)]
     owner: Owner,
 }
 
-#[derive(Deserialize)]
+#[derive(Default, Deserialize)]
 struct Owner {
+    #[serde(default)]
     login: String,
 }
 
@@ -252,12 +259,18 @@ impl GithubScanner {
         let response = self.request(url).await?;
         let status = response.status();
         let text = response.text().await?;
+        if !status.is_success() {
+            return Err(anyhow!(
+                "GitHub API error ({}): {}",
+                status,
+                truncate(&text, 300)
+            ));
+        }
         serde_json::from_str(&text).map_err(|error| {
             anyhow!(
-                "Failed to parse GitHub response ({}): {} — body: {}",
-                status,
+                "Failed to parse GitHub response: {} — body: {}",
                 error,
-                truncate(&text, 300)
+                truncate(&text, 500)
             )
         })
     }
