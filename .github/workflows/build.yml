@@ -82,6 +82,110 @@ jobs:
         working-directory: src-tauri
         run: cargo build --all-features
 
+  desktop-artifacts:
+    name: Desktop build (${{ matrix.label }})
+    if: github.event_name == 'push' && !startsWith(github.ref, 'refs/tags/')
+    needs: quality
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            label: linux-x86_64
+            args: ""
+          - os: windows-latest
+            label: windows-x86_64
+            args: ""
+          - os: macos-latest
+            label: macos-universal
+            args: "--target universal-apple-darwin"
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.os == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install Linux system deps
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            librsvg2-dev \
+            patchelf \
+            libssl-dev \
+            libgtk-3-dev \
+            libayatana-appindicator3-dev
+
+      - name: Install frontend deps
+        run: npm ci
+
+      - name: Prepare desktop bundle inputs
+        shell: bash
+        run: |
+          cp src-tauri/icons/128x128.png /tmp/raven-api-hunter-icon.png
+          npx tauri icon /tmp/raven-api-hunter-icon.png -o src-tauri/icons
+          mv src-tauri/src/bin/raven-hunter.rs /tmp/raven-hunter.rs
+          sed -i '/^\[\[bin\]\]$/,/^path = "src\/bin\/raven-hunter.rs"$/d' src-tauri/Cargo.toml
+
+      - name: Build Tauri app (bundled)
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          args: ${{ matrix.args }}
+
+      - name: Build Tauri app (unbundled single-file binary)
+        working-directory: src-tauri
+        run: cargo build --release ${{ matrix.os == 'macos-latest' && '--target universal-apple-darwin' || '' }}
+
+      - name: Collect unbundled binary
+        shell: bash
+        run: |
+          mkdir -p unbundled
+          case "${{ matrix.os }}" in
+            ubuntu-latest)
+              cp src-tauri/target/release/raven-api-hunter unbundled/raven-api-hunter-linux-x86_64 2>/dev/null || \
+              cp src-tauri/target/release/raven-api-hunter unbundled/raven-api-hunter-linux-x86_64 || true
+              ;;
+            windows-latest)
+              cp src-tauri/target/release/raven-api-hunter.exe unbundled/raven-api-hunter-windows-x86_64.exe 2>/dev/null || \
+              cp src-tauri/target/release/raven-api-hunter.exe unbundled/raven-api-hunter-windows-x86_64.exe || true
+              ;;
+            macos-latest)
+              cp src-tauri/target/universal-apple-darwin/release/raven-api-hunter unbundled/raven-api-hunter-macos-universal 2>/dev/null || \
+              cp src-tauri/target/release/raven-api-hunter unbundled/raven-api-hunter-macos-universal || true
+              ;;
+          esac
+          ls -la unbundled/ || true
+
+      - name: Upload desktop artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: raven-api-hunter-desktop-${{ matrix.label }}
+          path: |
+            src-tauri/target/release/bundle/**
+            src-tauri/target/universal-apple-darwin/release/bundle/**
+            unbundled/**
+          if-no-files-found: warn
+          retention-days: 30
+
   android-cli:
     name: Android CLI (aarch64-linux-android)
     runs-on: ubuntu-latest
