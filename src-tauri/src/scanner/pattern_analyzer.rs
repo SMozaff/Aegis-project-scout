@@ -72,7 +72,8 @@ impl PatternAnalyzer {
 
             for compiled in &self.patterns {
                 for captures in compiled.regex.captures_iter(line) {
-                    let Some(raw_capture) = captures.get(compiled.definition.extract_group) else {
+                    let capture_group = if captures.len() > 1 { 1 } else { 0 };
+                    let Some(raw_capture) = captures.get(capture_group) else {
                         continue;
                     };
 
