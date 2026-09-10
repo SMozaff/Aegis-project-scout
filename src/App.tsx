@@ -129,12 +129,12 @@ function App() {
 
   return (
     <div className="flex min-h-screen">
-      <aside className="fixed inset-y-0 left-0 z-20 w-64 border-r border-slate-800/90 bg-slate-950/90 px-4 py-5 backdrop-blur-xl">
+      <aside className="fixed inset-y-0 left-0 z-20 w-64 border-r border-slate-200/90 bg-slate-50/90 px-4 py-5 backdrop-blur-xl">
         <div className="flex items-center gap-3 px-2">
-          <div className="grid h-10 w-10 place-items-center rounded-xl border border-sky-500/30 bg-sky-500/10 text-sm font-black text-sky-300">A</div>
+          <div className="grid h-10 w-10 place-items-center rounded-xl border border-sky-500/30 bg-sky-500/10 text-sm font-black text-sky-700">A</div>
           <div>
-            <div className="font-semibold text-white">Raven API Hunter</div>
-            <div className="mt-0.5 text-[11px] uppercase tracking-[0.16em] text-slate-500">Public repo hygiene</div>
+            <div className="font-semibold text-slate-900">Raven API Hunter</div>
+            <div className="mt-0.5 text-[11px] uppercase tracking-[0.16em] text-slate-600">Public repo hygiene</div>
           </div>
         </div>
 
@@ -146,28 +146,28 @@ function App() {
                 type="button"
                 key={item.id}
                 onClick={() => setTab(item.id)}
-                className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-medium transition ${active ? "bg-sky-500/10 text-sky-200" : "text-slate-500 hover:bg-slate-900 hover:text-slate-300"}`}
+                className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-medium transition ${active ? "bg-sky-500/10 text-sky-700" : "text-slate-600 hover:bg-slate-100 hover:text-slate-700"}`}
               >
-                <span className={`grid h-8 w-8 place-items-center rounded-lg border text-[10px] font-bold ${active ? "border-sky-500/30 bg-sky-500/10" : "border-slate-800 bg-slate-900"}`}>{item.short}</span>
+                <span className={`grid h-8 w-8 place-items-center rounded-lg border text-[10px] font-bold ${active ? "border-sky-500/30 bg-sky-500/10" : "border-slate-200 bg-slate-100"}`}>{item.short}</span>
                 {item.label}
               </button>
             );
           })}
         </nav>
 
-        <div className="absolute bottom-5 left-4 right-4 rounded-xl border border-slate-800 bg-slate-900/70 p-3">
+        <div className="absolute bottom-5 left-4 right-4 rounded-xl border border-slate-200 bg-slate-100/70 p-3">
           <div className="flex items-center justify-between text-xs">
-            <span className="text-slate-500">GitHub mode</span>
-            <span className={tokenConfigured ? "text-emerald-300" : "text-amber-300"}>{tokenConfigured ? "Authenticated" : "Anonymous"}</span>
+            <span className="text-slate-600">GitHub mode</span>
+            <span className={tokenConfigured ? "text-emerald-700" : "text-amber-700"}>{tokenConfigured ? "Authenticated" : "Anonymous"}</span>
           </div>
-          <div className="mt-2 text-[11px] leading-5 text-slate-600">v0.1.0 · read-only repository analysis</div>
+          <div className="mt-2 text-[11px] leading-5 text-slate-9000">v0.1.0 · read-only repository analysis</div>
         </div>
       </aside>
 
       <main className="ml-64 min-h-screen flex-1">
         <div className="mx-auto max-w-[1500px] p-8">
           {error && (
-            <div className="mb-6 rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
+            <div className="mb-6 rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-700">
               {error}
             </div>
           )}

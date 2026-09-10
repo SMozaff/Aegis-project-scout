@@ -43,8 +43,8 @@ export function Settings({ settings, token, onTokenChange, onSave, onValidate }:
     <div className="space-y-6">
       <div>
         <div className="label">Settings</div>
-        <h1 className="mt-2 text-3xl font-semibold text-white">GitHub and application settings</h1>
-        <p className="mt-2 text-sm leading-6 text-slate-400">
+        <h1 className="mt-2 text-3xl font-semibold text-slate-900">GitHub and application settings</h1>
+        <p className="mt-2 text-sm leading-6 text-slate-600">
           The token is kept in frontend memory for the current app session. It is not written to the Raven API Hunter settings JSON file or exported reports.
         </p>
       </div>
@@ -74,7 +74,7 @@ export function Settings({ settings, token, onTokenChange, onSave, onValidate }:
               Validate token
             </button>
             {validation && (
-              <div className={`text-sm ${validation.authenticated ? "text-emerald-300" : "text-rose-300"}`}>
+              <div className={`text-sm ${validation.authenticated ? "text-emerald-700" : "text-rose-700"}`}>
                 {validation.message}
                 {validation.login ? ` (${validation.login})` : ""}
                 {validation.rate_limit_remaining != null ? ` · ${validation.rate_limit_remaining} API requests remaining` : ""}
@@ -86,20 +86,20 @@ export function Settings({ settings, token, onTokenChange, onSave, onValidate }:
         <div className="panel p-6">
           <div className="label">Saved defaults</div>
           <dl className="mt-4 space-y-4 text-sm">
-            <div className="flex justify-between gap-4"><dt className="text-slate-500">Languages</dt><dd className="text-right text-slate-200">{settings.languages.join(", ")}</dd></div>
-            <div className="flex justify-between gap-4"><dt className="text-slate-500">Lookback</dt><dd className="text-slate-200">{settings.lookback_days} days</dd></div>
-            <div className="flex justify-between gap-4"><dt className="text-slate-500">Repositories</dt><dd className="text-slate-200">{settings.max_repositories} max</dd></div>
-            <div className="flex justify-between gap-4"><dt className="text-slate-500">Files/repo</dt><dd className="text-slate-200">{settings.max_files_per_repository} max</dd></div>
-            <div className="flex justify-between gap-4"><dt className="text-slate-500">Health checks</dt><dd className="text-slate-200">{settings.health_check ? "Enabled" : "Disabled"}</dd></div>
+            <div className="flex justify-between gap-4"><dt className="text-slate-600">Languages</dt><dd className="text-right text-slate-800">{settings.languages.join(", ")}</dd></div>
+            <div className="flex justify-between gap-4"><dt className="text-slate-600">Lookback</dt><dd className="text-slate-800">{settings.lookback_days} days</dd></div>
+            <div className="flex justify-between gap-4"><dt className="text-slate-600">Repositories</dt><dd className="text-slate-800">{settings.max_repositories} max</dd></div>
+            <div className="flex justify-between gap-4"><dt className="text-slate-600">Files/repo</dt><dd className="text-slate-800">{settings.max_files_per_repository} max</dd></div>
+            <div className="flex justify-between gap-4"><dt className="text-slate-600">Health checks</dt><dd className="text-slate-800">{settings.health_check ? "Enabled" : "Disabled"}</dd></div>
           </dl>
           <button type="button" className="button-secondary mt-6 w-full" disabled={busy} onClick={save}>Save defaults</button>
-          {message && <div className="mt-3 text-xs text-slate-400">{message}</div>}
+          {message && <div className="mt-3 text-xs text-slate-600">{message}</div>}
         </div>
       </div>
 
       <div className="panel p-6">
-        <div className="font-semibold text-slate-100">Recommended GitHub token scope</div>
-        <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-400">
+        <div className="font-semibold text-slate-900">Recommended GitHub token scope</div>
+        <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-600">
           For public repository monitoring, use the least privilege available. Raven API Hunter only performs read operations against repository metadata, Git trees/blobs, and the authenticated user endpoint used for token validation. It does not create issues, commits, webhooks, branches, or repository changes.
         </p>
       </div>

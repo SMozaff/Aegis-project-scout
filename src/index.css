@@ -6,8 +6,8 @@
   font-family:
     Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
     sans-serif;
-  color: #e2e8f0;
-  background: #050816;
+  color: #1e293b;
+  background: #f8fafc;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
 }
@@ -21,9 +21,9 @@ body {
   min-width: 1000px;
   min-height: 100vh;
   background:
-    radial-gradient(circle at 15% 10%, rgba(37, 99, 235, 0.12), transparent 28%),
-    radial-gradient(circle at 85% 5%, rgba(14, 165, 233, 0.08), transparent 24%),
-    #050816;
+    radial-gradient(circle at 12% 0%, rgba(186, 230, 253, 0.55), transparent 30%),
+    radial-gradient(circle at 88% 8%, rgba(224, 242, 254, 0.8), transparent 28%),
+    #f8fafc;
 }
 
 button,
@@ -38,25 +38,25 @@ select {
 }
 
 ::-webkit-scrollbar-track {
-  background: rgba(15, 23, 42, 0.6);
+  background: rgba(226, 232, 240, 0.8);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(71, 85, 105, 0.8);
+  background: rgba(100, 116, 139, 0.65);
   border-radius: 999px;
 }
 
 @layer components {
   .panel {
-    @apply rounded-2xl border border-slate-800/90 bg-slate-900/70 shadow-panel backdrop-blur;
+    @apply rounded-2xl border border-slate-200 bg-white/95 shadow-lg backdrop-blur;
   }
 
   .label {
-    @apply text-xs font-semibold uppercase tracking-[0.14em] text-slate-400;
+    @apply text-xs font-semibold uppercase tracking-[0.14em] text-slate-600;
   }
 
   .input {
-    @apply w-full rounded-xl border border-slate-700 bg-slate-950/70 px-3 py-2.5 text-sm text-slate-100 outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20;
+    @apply w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20;
   }
 
   .button-primary {
@@ -64,6 +64,6 @@ select {
   }
 
   .button-secondary {
-    @apply inline-flex items-center justify-center rounded-xl border border-slate-700 bg-slate-900 px-4 py-2.5 text-sm font-semibold text-slate-200 transition hover:border-slate-600 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50;
+    @apply inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-sky-400 hover:bg-sky-50 disabled:cursor-not-allowed disabled:opacity-50;
   }
 }
