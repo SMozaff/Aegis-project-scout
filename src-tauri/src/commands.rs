@@ -277,18 +277,40 @@ pub async fn run_scan(
                 .collect();
             let verifier = ProviderVerifier::new();
             for match_index in auth_match_indices {
-                let matched = &matches[match_index];
-                let provider = provider_for_pattern(&matched.pattern_name);
+                let token = matches[match_index].captured.clone();
+                let pattern_name = matches[match_index].pattern_name.clone();
+                let provider = provider_for_pattern(&pattern_name);
                 let outcome = match provider.as_deref() {
-                    Some("openai") => verifier.verify_openai(&matched.captured).await?,
-                    Some("anthropic") => verifier.verify_anthropic(&matched.captured).await?,
-                    Some("github") => verifier.verify_github(&matched.captured).await?,
-                    Some("aws") => verifier.verify_aws(&matched.captured, "").await?,
-                    Some(provider) => VerifyOutcome::Unverifiable {
-                        reason: format!("Verification is not implemented for {provider} credentials."),
+                    Some("openai") => verifier.verify_openai(&token).await?,
+                    Some("anthropic") => verifier.verify_anthropic(&token).await?,
+                    Some("github") => verifier.verify_github(&token).await?,
+                    Some("google") => verifier.verify_google(&token).await?,
+                    Some("stripe") => verifier
+                        .verify_generic(&token, "https://api.stripe.com/v1/charges?limit=1")
+                        .await?,
+                    Some("slack") => verifier
+                        .verify_generic(&token, "https://slack.com/api/auth.test")
+                        .await?,
+                    Some("sendgrid") => verifier
+                        .verify_generic(&token, "https://api.sendgrid.com/v3/scopes")
+                        .await?,
+                    Some("twilio") => verifier
+                        .verify_generic(&token, "https://api.twilio.com/2010-04-01/Accounts.json")
+                        .await?,
+                    Some("huggingface") => verifier
+                        .verify_generic(&token, "https://huggingface.co/api/whoami-v2")
+                        .await?,
+                    Some("deepseek") => verifier
+                        .verify_generic(&token, "https://api.deepseek.com/v1/models")
+                        .await?,
+                    Some("aws") => VerifyOutcome::Unverifiable {
+                        reason: "AWS requires paired keys; single-key verification not supported".into(),
                     },
                     None => VerifyOutcome::Unverifiable {
                         reason: "The credential provider could not be determined.".into(),
+                    },
+                    Some(provider) => VerifyOutcome::Unverifiable {
+                        reason: format!("No verification endpoint is known for {provider} credentials."),
                     },
                 };
                 if matches!(outcome, VerifyOutcome::Valid { .. }) {
@@ -299,13 +321,16 @@ pub async fn run_scan(
                             source_repo: repository.name.clone(),
                             source_file: matches[match_index].file_path.clone(),
                             line_number: matches[match_index].line_number as u32,
-                            pattern_name: matches[match_index].pattern_name.clone(),
+                        pattern_name,
                             outcome: outcome.clone(),
                         });
                     }
                 }
                 matches[match_index].verification = Some(outcome);
             }
+        }
+        for matched in matches.iter_mut().filter(|matched| matched.category == "auth_token") {
+            matched.captured = "[REDACTED]".into();
         }
 
         let endpoints: Vec<String> = matches

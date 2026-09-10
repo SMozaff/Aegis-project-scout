@@ -57,13 +57,25 @@ impl ProviderVerifier {
         Ok(outcome_for_status(response.status(), "GitHub"))
     }
 
+    pub async fn verify_google(&self, token: &str) -> Result<VerifyOutcome, String> {
+        let response = self
+            .client
+            .get("https://generativelanguage.googleapis.com/v1/models")
+            .query(&[("key", token)])
+            .send()
+            .await
+            .map_err(|error| error.to_string())?;
+
+        Ok(outcome_for_status(response.status(), "Google"))
+    }
+
     pub async fn verify_aws(
         &self,
         _access_key: &str,
         _secret_key: &str,
     ) -> Result<VerifyOutcome, String> {
         Ok(VerifyOutcome::Unverifiable {
-            reason: "AWS verification is not implemented yet.".into(),
+            reason: "AWS requires paired keys; single-key verification not supported".into(),
         })
     }
 
