@@ -253,7 +253,10 @@ mod tests {
         let value = serde_json::to_value(&report).unwrap();
         assert_eq!(value["verified_credentials"].as_array().unwrap().len(), 2);
         assert_eq!(value["verified_credentials"][0]["outcome"]["kind"], "valid");
-        assert_eq!(value["verified_credentials"][1]["outcome"]["kind"], "unverifiable");
+        assert_eq!(
+            value["verified_credentials"][1]["outcome"]["kind"],
+            "unverifiable"
+        );
 
         let filename = format!(
             "raven-export-test-{}.csv",
@@ -267,7 +270,9 @@ mod tests {
         let csv = fs::read_to_string(&path).unwrap();
         assert!(csv.contains("provider,source_repo,source_file,line_number,pattern_name,verification_kind,verification_detail"));
         assert!(csv.contains("openai,owner/repo,README.md,12,openai_legacy,valid,accepted"));
-        assert!(csv.contains("github,\"owner/repo,2\",config.yml,34,github_pat_fg,unverifiable,rate limited"));
+        assert!(csv.contains(
+            "github,\"owner/repo,2\",config.yml,34,github_pat_fg,unverifiable,rate limited"
+        ));
         let _ = fs::remove_file(path);
     }
 }

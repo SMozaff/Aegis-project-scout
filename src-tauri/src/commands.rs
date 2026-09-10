@@ -106,10 +106,7 @@ pub async fn validate_github_token(token: String) -> Result<TokenValidation, Str
 }
 
 #[tauri::command]
-pub async fn verify_credential(
-    provider: String,
-    token: String,
-) -> Result<VerifyOutcome, String> {
+pub async fn verify_credential(provider: String, token: String) -> Result<VerifyOutcome, String> {
     if token.trim().is_empty() {
         return Err("Credential token is required.".into());
     }
@@ -285,32 +282,50 @@ pub async fn run_scan(
                     Some("anthropic") => verifier.verify_anthropic(&token).await?,
                     Some("github") => verifier.verify_github(&token).await?,
                     Some("google") => verifier.verify_google(&token).await?,
-                    Some("stripe") => verifier
-                        .verify_generic(&token, "https://api.stripe.com/v1/charges?limit=1")
-                        .await?,
-                    Some("slack") => verifier
-                        .verify_generic(&token, "https://slack.com/api/auth.test")
-                        .await?,
-                    Some("sendgrid") => verifier
-                        .verify_generic(&token, "https://api.sendgrid.com/v3/scopes")
-                        .await?,
-                    Some("twilio") => verifier
-                        .verify_generic(&token, "https://api.twilio.com/2010-04-01/Accounts.json")
-                        .await?,
-                    Some("huggingface") => verifier
-                        .verify_generic(&token, "https://huggingface.co/api/whoami-v2")
-                        .await?,
-                    Some("deepseek") => verifier
-                        .verify_generic(&token, "https://api.deepseek.com/v1/models")
-                        .await?,
+                    Some("stripe") => {
+                        verifier
+                            .verify_generic(&token, "https://api.stripe.com/v1/charges?limit=1")
+                            .await?
+                    }
+                    Some("slack") => {
+                        verifier
+                            .verify_generic(&token, "https://slack.com/api/auth.test")
+                            .await?
+                    }
+                    Some("sendgrid") => {
+                        verifier
+                            .verify_generic(&token, "https://api.sendgrid.com/v3/scopes")
+                            .await?
+                    }
+                    Some("twilio") => {
+                        verifier
+                            .verify_generic(
+                                &token,
+                                "https://api.twilio.com/2010-04-01/Accounts.json",
+                            )
+                            .await?
+                    }
+                    Some("huggingface") => {
+                        verifier
+                            .verify_generic(&token, "https://huggingface.co/api/whoami-v2")
+                            .await?
+                    }
+                    Some("deepseek") => {
+                        verifier
+                            .verify_generic(&token, "https://api.deepseek.com/v1/models")
+                            .await?
+                    }
                     Some("aws") => VerifyOutcome::Unverifiable {
-                        reason: "AWS requires paired keys; single-key verification not supported".into(),
+                        reason: "AWS requires paired keys; single-key verification not supported"
+                            .into(),
                     },
                     None => VerifyOutcome::Unverifiable {
                         reason: "The credential provider could not be determined.".into(),
                     },
                     Some(provider) => VerifyOutcome::Unverifiable {
-                        reason: format!("No verification endpoint is known for {provider} credentials."),
+                        reason: format!(
+                            "No verification endpoint is known for {provider} credentials."
+                        ),
                     },
                 };
                 if matches!(outcome, VerifyOutcome::Valid { .. }) {
@@ -321,7 +336,7 @@ pub async fn run_scan(
                             source_repo: repository.name.clone(),
                             source_file: raw_matches[match_index].pattern.file_path.clone(),
                             line_number: raw_matches[match_index].pattern.line_number as u32,
-                        pattern_name,
+                            pattern_name,
                             outcome: outcome.clone(),
                         });
                     }
@@ -402,7 +417,7 @@ pub async fn run_scan(
         findings.push(finding);
     }
 
-        metrics.unique_absolute_endpoints = global_endpoints.len();
+    metrics.unique_absolute_endpoints = global_endpoints.len();
     let completed_at = Utc::now();
     let report = ScanReport {
         generated_at: completed_at.to_rfc3339(),

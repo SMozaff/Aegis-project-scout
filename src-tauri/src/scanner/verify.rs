@@ -115,7 +115,9 @@ fn outcome_for_status(status: StatusCode, provider: &str) -> VerifyOutcome {
         }
     } else {
         VerifyOutcome::Unverifiable {
-            reason: format!("{provider} returned {status}; credential validity could not be determined."),
+            reason: format!(
+                "{provider} returned {status}; credential validity could not be determined."
+            ),
         }
     }
 }

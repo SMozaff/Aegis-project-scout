@@ -93,9 +93,7 @@ impl GithubScanner {
             for search_query in [
                 format!("\"{technology}\" in:file filename:.env"),
                 format!("\"{technology}\" in:file filename:config"),
-                format!(
-                    "\"{technology}\" extension:yml OR extension:yaml OR extension:json token"
-                ),
+                format!("\"{technology}\" extension:yml OR extension:yaml OR extension:json token"),
             ] {
                 let encoded = url::form_urlencoded::byte_serialize(search_query.as_bytes())
                     .collect::<String>();
@@ -196,7 +194,8 @@ impl GithubScanner {
             endpoints: Vec::new(),
             health_status: None,
             confidence_score: if terms.is_empty() { 0.0 } else { 0.5 },
-            evidence: "Collected from public GitHub code-search results and repository metadata".into(),
+            evidence: "Collected from public GitHub code-search results and repository metadata"
+                .into(),
             source_file: None,
         })
     }
