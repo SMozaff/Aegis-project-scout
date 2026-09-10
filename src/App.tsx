@@ -4,7 +4,6 @@ import { Dashboard } from "./components/Dashboard";
 import { ResultsDisplay } from "./components/ResultsDisplay";
 import { ScannerConfig } from "./components/ScannerConfig";
 import { Settings } from "./components/Settings";
-import { AppProvider } from "./context/AppContext";
 import { api } from "./lib/tauri";
 import type {
   AppSettings,
@@ -209,6 +208,4 @@ function App() {
   );
 }
 
-function AppWithProvider(){ return <AppProvider><App /></AppProvider>; }
-
-export default AppWithProvider;
+export default App;
