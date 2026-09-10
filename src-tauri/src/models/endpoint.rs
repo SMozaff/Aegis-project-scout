@@ -28,7 +28,6 @@ pub struct PatternMatch {
     pub file_path: String,
     pub line_number: usize,
     pub excerpt: String,
-    pub captured: String,
     pub absolute_endpoint: Option<String>,
     pub verification: Option<crate::scanner::verify::VerifyOutcome>,
 }

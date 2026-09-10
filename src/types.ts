@@ -32,7 +32,6 @@ export interface PatternMatch {
   file_path: string;
   line_number: number;
   excerpt: string;
-  captured: string;
   absolute_endpoint?: string | null;
   verification?: VerifyOutcome | null;
 }

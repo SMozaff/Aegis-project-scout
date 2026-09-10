@@ -240,13 +240,13 @@ pub async fn run_scan(
         let allocated_file_reads =
             (settings.max_files_per_repository as usize).min(blob_read_budget);
         blob_read_budget = blob_read_budget.saturating_sub(allocated_file_reads);
-        let mut matches = Vec::new();
+        let mut raw_matches = Vec::new();
         let mut scanned_files = 0usize;
         let mut warnings = Vec::new();
 
         if allocated_file_reads > 0 {
             if let Ok(readme) = github.fetch_readme(&owner, &repo).await {
-                matches.extend(analyzer.analyze("README.md", &readme));
+                raw_matches.extend(analyzer.analyze("README.md", &readme));
                 scanned_files += 1;
             } else {
                 warnings.push("README could not be fetched.".into());
@@ -258,27 +258,27 @@ pub async fn run_scan(
         if allocated_file_reads > 1 {
             if let Ok(code) = github.fetch_code_file(&owner, &repo, "README.md").await {
                 if scanned_files == 0 {
-                    matches.extend(analyzer.analyze("README.md", &code));
+                    raw_matches.extend(analyzer.analyze("README.md", &code));
                     scanned_files += 1;
                 }
             }
         }
 
-        matches.sort_by_key(|matched| (matched.category != "auth_token") as u8);
+        raw_matches.sort_by_key(|matched| (matched.pattern.category != "auth_token") as u8);
 
         let mut verified_count = 0u32;
         if config.verify_credentials {
-            let auth_match_indices: Vec<usize> = matches
+            let auth_match_indices: Vec<usize> = raw_matches
                 .iter()
                 .enumerate()
-                .filter(|(_, matched)| matched.category == "auth_token")
+                .filter(|(_, matched)| matched.pattern.category == "auth_token")
                 .map(|(match_index, _)| match_index)
                 .take(10)
                 .collect();
             let verifier = ProviderVerifier::new();
             for match_index in auth_match_indices {
-                let token = matches[match_index].captured.clone();
-                let pattern_name = matches[match_index].pattern_name.clone();
+                let token = raw_matches[match_index].captured.clone();
+                let pattern_name = raw_matches[match_index].pattern.pattern_name.clone();
                 let provider = provider_for_pattern(&pattern_name);
                 let outcome = match provider.as_deref() {
                     Some("openai") => verifier.verify_openai(&token).await?,
@@ -319,19 +319,20 @@ pub async fn run_scan(
                         verified_credentials.push(VerifiedCredential {
                             provider,
                             source_repo: repository.name.clone(),
-                            source_file: matches[match_index].file_path.clone(),
-                            line_number: matches[match_index].line_number as u32,
+                            source_file: raw_matches[match_index].pattern.file_path.clone(),
+                            line_number: raw_matches[match_index].pattern.line_number as u32,
                         pattern_name,
                             outcome: outcome.clone(),
                         });
                     }
                 }
-                matches[match_index].verification = Some(outcome);
+                raw_matches[match_index].pattern.verification = Some(outcome);
             }
         }
-        for matched in matches.iter_mut().filter(|matched| matched.category == "auth_token") {
-            matched.captured = "[REDACTED]".into();
-        }
+        let matches = raw_matches
+            .into_iter()
+            .map(|raw| raw.pattern)
+            .collect::<Vec<_>>();
 
         let endpoints: Vec<String> = matches
             .iter()

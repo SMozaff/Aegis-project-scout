@@ -34,6 +34,12 @@ pub struct PatternAnalyzer {
     authorization_value: Regex,
 }
 
+#[derive(Debug, Clone)]
+pub(crate) struct RawPatternMatch {
+    pub(crate) pattern: PatternMatch,
+    pub(crate) captured: String,
+}
+
 impl PatternAnalyzer {
     pub fn load_default() -> Result<Self, String> {
         let definitions: Vec<PatternDefinition> = serde_json::from_str(DEFAULT_PATTERNS)
@@ -62,7 +68,7 @@ impl PatternAnalyzer {
         })
     }
 
-    pub fn analyze(&self, file_path: &str, content: &str) -> Vec<PatternMatch> {
+    pub fn analyze(&self, file_path: &str, content: &str) -> Vec<RawPatternMatch> {
         let mut matches = Vec::new();
 
         for (line_index, line) in content.lines().enumerate() {
@@ -83,7 +89,6 @@ impl PatternAnalyzer {
                     }
 
                     let absolute_endpoint = normalize_health_endpoint(&normalized);
-                    let captured = redact_url_query(&normalized);
                     let excerpt = self.redact_excerpt(line);
 
                     let confidence = if compiled.definition.category == "endpoint" {
@@ -92,23 +97,25 @@ impl PatternAnalyzer {
                         compiled.definition.confidence.clone()
                     };
 
-                    matches.push(PatternMatch {
-                        pattern_id: compiled.definition.id.clone(),
-                        pattern_name: compiled.definition.name.clone(),
-                        category: compiled.definition.category.clone(),
-                        confidence,
-                        file_path: file_path.to_string(),
-                        line_number: line_index + 1,
-                        excerpt,
-                        captured,
-                        absolute_endpoint,
-                        verification: None,
+                    matches.push(RawPatternMatch {
+                        pattern: PatternMatch {
+                            pattern_id: compiled.definition.id.clone(),
+                            pattern_name: compiled.definition.name.clone(),
+                            category: compiled.definition.category.clone(),
+                            confidence,
+                            file_path: file_path.to_string(),
+                            line_number: line_index + 1,
+                            excerpt,
+                            absolute_endpoint,
+                            verification: None,
+                        },
+                        captured: normalized,
                     });
                 }
             }
         }
 
-        matches.sort_by_key(|matched| (matched.category != "auth_token") as u8);
+        matches.sort_by_key(|matched| (matched.pattern.category != "auth_token") as u8);
         matches
     }
 

@@ -124,7 +124,7 @@ fn write_csv(path: &PathBuf, report: &ScanReport) -> Result<(), String> {
                     csv_safe(&matched.confidence),
                     csv_safe(&matched.file_path),
                     matched.line_number.to_string(),
-                    csv_safe(captured_for_export(matched.category.as_str(), &matched.captured)),
+                    String::new(),
                     health.map(|h| h.reachable.to_string()).unwrap_or_default(),
                     health.map(|h| h.blocked.to_string()).unwrap_or_default(),
                     health
@@ -176,22 +176,6 @@ fn write_csv(path: &PathBuf, report: &ScanReport) -> Result<(), String> {
 
 fn redacted_json_report(report: &ScanReport) -> serde_json::Value {
     let mut value = serde_json::to_value(report).unwrap_or_else(|_| serde_json::json!({}));
-    if let Some(findings) = value.get_mut("findings").and_then(|value| value.as_array_mut()) {
-        for finding in findings {
-            if let Some(matches) = finding
-                .get_mut("matches")
-                .and_then(|value| value.as_array_mut())
-            {
-                for matched in matches {
-                    if matched.get("category").and_then(|value| value.as_str()) == Some("auth_token")
-                    {
-                        matched["captured"] = serde_json::Value::String("[REDACTED]".into());
-                    }
-                }
-            }
-        }
-    }
-
     value["verified_credentials"] = serde_json::Value::Array(
         report
             .verified_credentials
@@ -209,14 +193,6 @@ fn redacted_json_report(report: &ScanReport) -> serde_json::Value {
             .collect(),
     );
     value
-}
-
-fn captured_for_export<'a>(category: &str, captured: &'a str) -> &'a str {
-    if category == "auth_token" {
-        "[REDACTED]"
-    } else {
-        captured
-    }
 }
 
 fn verification_detail(outcome: &VerifyOutcome) -> &str {
