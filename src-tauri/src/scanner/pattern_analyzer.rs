@@ -4,7 +4,7 @@ use url::Url;
 
 use crate::models::endpoint::PatternMatch;
 
-const DEFAULT_PATTERNS: &str = include_str!("../patterns/default_patterns.json");
+const DEFAULT_PATTERNS: &str = include_str!("../../patterns/default_patterns.json");
 
 #[derive(Debug, Clone, Deserialize)]
 struct PatternDefinition {

@@ -1,10 +1,7 @@
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use std::time::Duration;
-
 use super::endpoint::ApiEndpoint;
-use super::pattern::Pattern;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProjectDiscovery {
