@@ -34,6 +34,7 @@ function App() {
   const [tab, setTab] = useState<Tab>("dashboard");
   const [settings, setSettings] = useState<AppSettings>(fallbackSettings);
   const [token, setToken] = useState("");
+  const [verifyCredentials, setVerifyCredentials] = useState(true);
   const [report, setReport] = useState<ScanReport | null>(null);
   const [liveFindings, setLiveFindings] = useState<RepositoryFinding[]>([]);
   const [progress, setProgress] = useState<ScanProgress | null>(null);
@@ -94,6 +95,7 @@ function App() {
       const next = await api.runScan({
         ...settings,
         github_token: token.trim() || null,
+        verify_credentials: verifyCredentials,
       });
       setReport(next);
     } catch (scanError) {
@@ -182,6 +184,8 @@ function App() {
               running={running}
               progress={progress}
               tokenConfigured={tokenConfigured}
+              verifyCredentials={verifyCredentials}
+              onVerifyCredentialsChange={setVerifyCredentials}
             />
           )}
           {tab === "results" && (

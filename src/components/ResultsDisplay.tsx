@@ -48,17 +48,17 @@ export function ResultsDisplay({
       <div className="flex items-end justify-between gap-6">
         <div>
           <div className="label">Results</div>
-          <h1 className="mt-2 text-3xl font-semibold text-white">Repository findings</h1>
+          <h1 className="mt-2 text-3xl font-semibold text-white">Credential Audit Results</h1>
           <p className="mt-2 text-sm leading-6 text-slate-400">
             {running ? "Findings are arriving as each repository completes." : "Review pattern matches and endpoint responsiveness from the completed scan."}
           </p>
         </div>
         <div className="flex gap-2">
           <button type="button" className="button-secondary" disabled={!report || running} onClick={() => void onExport("json")}>
-            Export JSON
+            Export Audit Report (JSON)
           </button>
           <button type="button" className="button-secondary" disabled={!report || running} onClick={() => void onExport("csv")}>
-            Export CSV
+            Export Audit Report (CSV)
           </button>
         </div>
       </div>
@@ -97,6 +97,7 @@ export function ResultsDisplay({
                   "Matches",
                   "Endpoints",
                   "Health",
+                  "Verified",
                 ].map((heading) => (
                   <th key={heading} className="px-5 py-4 font-medium">{heading}</th>
                 ))}
@@ -105,7 +106,7 @@ export function ResultsDisplay({
             <tbody className="divide-y divide-slate-800/80">
               {findings.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-5 py-14 text-center text-slate-500">
+                  <td colSpan={8} className="px-5 py-14 text-center text-slate-500">
                     {running ? "Waiting for repository findings…" : "Run a scan to populate results."}
                   </td>
                 </tr>
@@ -126,6 +127,13 @@ export function ResultsDisplay({
                       <td className="px-5 py-4 text-sky-300">{finding.matches.length}</td>
                       <td className="px-5 py-4">{endpointCount(finding)}</td>
                       <td className="px-5 py-4">{healthLabel(finding)}</td>
+                      <td className="px-5 py-4">
+                        {finding.matches.some((match) => match.verification?.kind === "valid")
+                          ? "✓"
+                          : finding.matches.some((match) => match.verification?.kind === "invalid")
+                            ? "✕"
+                            : "—"}
+                      </td>
                     </tr>
                   );
                 })

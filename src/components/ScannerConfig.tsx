@@ -8,6 +8,8 @@ interface ScannerConfigProps {
   running: boolean;
   progress: ScanProgress | null;
   tokenConfigured: boolean;
+  verifyCredentials: boolean;
+  onVerifyCredentialsChange: (enabled: boolean) => void;
 }
 
 const languageOptions = ["TypeScript", "JavaScript", "Python", "Go", "Rust", "Java", "Ruby", "PHP"];
@@ -19,6 +21,8 @@ export function ScannerConfig({
   running,
   progress,
   tokenConfigured,
+  verifyCredentials,
+  onVerifyCredentialsChange,
 }: ScannerConfigProps) {
   const [webSearch, setWebSearch] = useState(false);
 
@@ -112,6 +116,15 @@ export function ScannerConfig({
                 className="accent-sky-500"
               />
               Run safe endpoint health checks
+            </label>
+            <label className="flex items-center gap-3 text-sm text-slate-300">
+              <input
+                type="checkbox"
+                checked={verifyCredentials}
+                onChange={(event) => onVerifyCredentialsChange(event.target.checked)}
+                className="accent-sky-500"
+              />
+              Verify credentials (may consume provider API quota)
             </label>
           </div>
         </div>

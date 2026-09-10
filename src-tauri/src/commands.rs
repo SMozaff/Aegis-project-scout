@@ -264,44 +264,46 @@ pub async fn run_scan(
             }
         }
 
-        let auth_match_indices: Vec<usize> = matches
-            .iter()
-            .enumerate()
-            .filter(|(_, matched)| matched.category == "auth_token")
-            .map(|(match_index, _)| match_index)
-            .take(10)
-            .collect();
-        let verifier = ProviderVerifier::new();
         let mut verified_count = 0u32;
-        for match_index in auth_match_indices {
-            let matched = &matches[match_index];
-            let provider = provider_for_pattern(&matched.pattern_name);
-            let outcome = match provider.as_deref() {
-                Some("openai") => verifier.verify_openai(&matched.captured).await?,
-                Some("anthropic") => verifier.verify_anthropic(&matched.captured).await?,
-                Some("github") => verifier.verify_github(&matched.captured).await?,
-                Some("aws") => verifier.verify_aws(&matched.captured, "").await?,
-                Some(provider) => VerifyOutcome::Unverifiable {
-                    reason: format!("Verification is not implemented for {provider} credentials."),
-                },
-                None => VerifyOutcome::Unverifiable {
-                    reason: "The credential provider could not be determined.".into(),
-                },
-            };
-            if matches!(outcome, VerifyOutcome::Valid { .. }) {
-                verified_count += 1;
-                if let Some(provider) = provider.clone() {
-                    verified_credentials.push(VerifiedCredential {
-                        provider,
-                        source_repo: repository.name.clone(),
-                        source_file: matches[match_index].file_path.clone(),
-                        line_number: matches[match_index].line_number as u32,
-                        pattern_name: matches[match_index].pattern_name.clone(),
-                        outcome: outcome.clone(),
-                    });
+        if config.verify_credentials {
+            let auth_match_indices: Vec<usize> = matches
+                .iter()
+                .enumerate()
+                .filter(|(_, matched)| matched.category == "auth_token")
+                .map(|(match_index, _)| match_index)
+                .take(10)
+                .collect();
+            let verifier = ProviderVerifier::new();
+            for match_index in auth_match_indices {
+                let matched = &matches[match_index];
+                let provider = provider_for_pattern(&matched.pattern_name);
+                let outcome = match provider.as_deref() {
+                    Some("openai") => verifier.verify_openai(&matched.captured).await?,
+                    Some("anthropic") => verifier.verify_anthropic(&matched.captured).await?,
+                    Some("github") => verifier.verify_github(&matched.captured).await?,
+                    Some("aws") => verifier.verify_aws(&matched.captured, "").await?,
+                    Some(provider) => VerifyOutcome::Unverifiable {
+                        reason: format!("Verification is not implemented for {provider} credentials."),
+                    },
+                    None => VerifyOutcome::Unverifiable {
+                        reason: "The credential provider could not be determined.".into(),
+                    },
+                };
+                if matches!(outcome, VerifyOutcome::Valid { .. }) {
+                    verified_count += 1;
+                    if let Some(provider) = provider.clone() {
+                        verified_credentials.push(VerifiedCredential {
+                            provider,
+                            source_repo: repository.name.clone(),
+                            source_file: matches[match_index].file_path.clone(),
+                            line_number: matches[match_index].line_number as u32,
+                            pattern_name: matches[match_index].pattern_name.clone(),
+                            outcome: outcome.clone(),
+                        });
+                    }
                 }
+                matches[match_index].verification = Some(outcome);
             }
-            matches[match_index].verification = Some(outcome);
         }
 
         let endpoints: Vec<String> = matches

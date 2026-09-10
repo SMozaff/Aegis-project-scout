@@ -10,6 +10,7 @@ export interface AppSettings {
 
 export interface ScanConfig extends AppSettings {
   github_token?: string | null;
+  verify_credentials: boolean;
 }
 
 export interface RepositorySummary {
