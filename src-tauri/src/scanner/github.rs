@@ -55,9 +55,7 @@ impl GithubScanner {
             let sub_queries = [
                 format!("\"{technology}\" in:file filename:.env"),
                 format!("\"{technology}\" in:file filename:config"),
-                format!(
-                    "\"{technology}\" extension:yml OR extension:yaml OR extension:json token"
-                ),
+                format!("\"{technology}\" extension:yml OR extension:yaml OR extension:json token"),
             ];
 
             for search_query in sub_queries {
@@ -225,12 +223,7 @@ impl GithubScanner {
     }
 
     pub async fn fetch_readme(&self, owner: &str, repo: &str) -> Result<String> {
-        let readme = self
-            .client
-            .repos(owner, repo)
-            .get_readme()
-            .send()
-            .await?;
+        let readme = self.client.repos(owner, repo).get_readme().send().await?;
         match readme.content {
             Some(encoded) => {
                 let cleaned: String = encoded.chars().filter(|c| !c.is_whitespace()).collect();
