@@ -26,6 +26,7 @@ anyhow = "1"
 keyring = "3"
 dirs = "5"
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "charset", "http2"] }
+octocrab = { version = "0.41", default-features = false, features = ["rustls"] }
 regex = "1"
 tokio = { version = "1", features = ["macros", "net", "time", "sync"] }
 chrono = { version = "0.4", features = ["serde", "clock"] }
@@ -35,13 +36,3 @@ url = "2"
 clap = { version = "4", features = ["derive", "env"] }
 
 [profile.release]
-panic = "abort"
-codegen-units = 1
-lto = true
-opt-level = "s"
-strip = true
-
-[lints.rust]
-dead_code = "allow"
-unused_variables = "allow"
-unused_imports = "warn"
