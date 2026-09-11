@@ -1,5 +1,3 @@
-use reqwest::header::{ACCEPT, AUTHORIZATION, USER_AGENT};
-use serde::Deserialize;
 use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::{AppHandle, Emitter, State};
 
@@ -50,39 +48,30 @@ pub async fn validate_github_token(token: String) -> Result<TokenValidation, Str
         return Err("GitHub token is unreasonably long.".into());
     }
 
-    #[derive(Deserialize)]
-    struct GithubUser {
-        login: String,
-    }
-
-    let client = reqwest::Client::builder()
-        .user_agent("Raven-API-Hunter")
+    let client = octocrab::Octocrab::builder()
+        .personal_token(token)
         .build()
         .map_err(|error| error.to_string())?;
-    let response = client
-        .get("https://api.github.com/user")
-        .header(USER_AGENT, "Raven-API-Hunter")
-        .header(ACCEPT, "application/vnd.github+json")
-        .header(AUTHORIZATION, format!("Bearer {token}"))
-        .send()
+
+    let user = match client.current().user().await {
+        Ok(user) => user,
+        Err(error) => {
+            return Ok(TokenValidation {
+                authenticated: false,
+                login: None,
+                rate_limit_remaining: None,
+                message: format!("GitHub rejected the token: {error}"),
+            });
+        }
+    };
+
+    let remaining = client
+        .ratelimit()
+        .get()
         .await
-        .map_err(|error| error.to_string())?;
-    let remaining = response
-        .headers()
-        .get("x-ratelimit-remaining")
-        .and_then(|value| value.to_str().ok())
-        .and_then(|value| value.parse::<u64>().ok());
+        .ok()
+        .map(|limits| limits.resources.core.remaining);
 
-    if !response.status().is_success() {
-        return Ok(TokenValidation {
-            authenticated: false,
-            login: None,
-            rate_limit_remaining: remaining,
-            message: format!("GitHub rejected the token ({})", response.status()),
-        });
-    }
-
-    let user: GithubUser = response.json().await.map_err(|error| error.to_string())?;
     Ok(TokenValidation {
         authenticated: true,
         login: Some(user.login.clone()),
