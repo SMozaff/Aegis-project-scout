@@ -1,91 +1,37 @@
 use anyhow::{anyhow, Result};
 use base64::Engine;
-use reqwest::header::{HeaderMap, HeaderValue, ACCEPT, AUTHORIZATION, USER_AGENT};
-use serde::{de::DeserializeOwned, Deserialize};
+use octocrab::{models, Octocrab, Page};
 use std::collections::HashSet;
-use tokio::time::{sleep, Duration};
 
 use crate::models::project::ProjectDiscovery;
 
-const API: &str = "https://api.github.com";
 const RESULTS_PER_QUERY: usize = 30;
 const ENRICHMENT_LIMIT: usize = 20;
 
+/// GitHub API client wrapper built on `octocrab`.
+///
+/// Using octocrab's typed models guarantees our deserialization always
+/// matches what GitHub actually returns — the code-search response uses
+/// a *reduced* repository shape, and octocrab's `models::Repository`
+/// reflects that (fields like `stargazers_count` are `Option<u64>`).
+///
+/// For enriched repos (the first `ENRICHMENT_LIMIT` results), we make a
+/// second call to `/repos/{owner}/{repo}` to fetch full metadata — stars,
+/// forks, language, topics — which the code-search endpoint does not
+/// provide.
 #[derive(Clone)]
 pub struct GithubScanner {
-    client: reqwest::Client,
-}
-
-#[derive(Deserialize)]
-struct CodeSearchResult {
-    #[serde(default)]
-    total_count: u64,
-    #[serde(default)]
-    incomplete_results: bool,
-    #[serde(default)]
-    items: Vec<CodeSearchItem>,
-}
-
-#[derive(Deserialize)]
-struct CodeSearchItem {
-    repository: Repo,
-    #[serde(default)]
-    score: f64,
-}
-
-#[derive(Deserialize)]
-struct Repo {
-    #[serde(default)]
-    name: String,
-    #[serde(default)]
-    full_name: String,
-    #[serde(default)]
-    html_url: String,
-    description: Option<String>,
-    #[serde(default)]
-    stargazers_count: u64,
-    #[serde(default)]
-    forks_count: u64,
-    language: Option<String>,
-    #[serde(default)]
-    topics: Vec<String>,
-    #[serde(default)]
-    owner: Owner,
-}
-
-#[derive(Default, Deserialize)]
-struct Owner {
-    #[serde(default)]
-    login: String,
-}
-
-#[derive(Deserialize)]
-struct Content {
-    #[serde(default)]
-    content: String,
-    #[serde(default)]
-    encoding: String,
+    client: Octocrab,
 }
 
 impl GithubScanner {
     pub fn new(token: Option<String>) -> Result<Self> {
-        let mut headers = HeaderMap::new();
-        headers.insert(USER_AGENT, HeaderValue::from_static("Raven-API-Hunter"));
-        headers.insert(
-            ACCEPT,
-            HeaderValue::from_static("application/vnd.github+json"),
-        );
-        if let Some(token) = token {
-            headers.insert(
-                AUTHORIZATION,
-                HeaderValue::from_str(&format!("Bearer {token}"))?,
-            );
+        let mut builder = Octocrab::builder();
+        if let Some(t) = token {
+            builder = builder.personal_token(t);
         }
-        Ok(Self {
-            client: reqwest::Client::builder()
-                .default_headers(headers)
-                .build()?,
-        })
+        let client = builder.build()?;
+        Ok(Self { client })
     }
 
     pub async fn search_projects(
@@ -102,39 +48,62 @@ impl GithubScanner {
             return Err(anyhow!("Select at least one technology to search for."));
         }
 
-        let mut repositories = Vec::new();
-        let mut seen = HashSet::new();
+        let mut repositories: Vec<models::Repository> = Vec::new();
+        let mut seen: HashSet<String> = HashSet::new();
+
         for technology in technologies {
-            for search_query in [
+            let sub_queries = [
                 format!("\"{technology}\" in:file filename:.env"),
                 format!("\"{technology}\" in:file filename:config"),
-                format!("\"{technology}\" extension:yml OR extension:yaml OR extension:json token"),
-            ] {
-                let encoded = url::form_urlencoded::byte_serialize(search_query.as_bytes())
-                    .collect::<String>();
+                format!(
+                    "\"{technology}\" extension:yml OR extension:yaml OR extension:json token"
+                ),
+            ];
+
+            for search_query in sub_queries {
                 let mut collected = 0usize;
 
-                for page in 1..=10 {
+                let mut page: Page<models::CodeSearchResultItem> = self
+                    .client
+                    .search()
+                    .code(&search_query)
+                    .per_page(RESULTS_PER_QUERY as u8)
+                    .send()
+                    .await?;
+
+                for item in &page.items {
                     if collected >= RESULTS_PER_QUERY {
                         break;
                     }
-                    let result: CodeSearchResult = self
-                        .request_json(format!(
-                            "{API}/search/code?q={encoded}&page={page}&per_page={RESULTS_PER_QUERY}"
-                        ))
-                        .await?;
-                    if result.items.is_empty() {
-                        break;
+                    collected += 1;
+                    let repo = item.repository.clone();
+                    if let Some(key) = repo.full_name.clone() {
+                        if !key.is_empty() && seen.insert(key) {
+                            repositories.push(repo);
+                        }
                     }
+                }
 
-                    for item in result.items {
-                        collected += 1;
-                        if seen.insert(item.repository.full_name.clone()) {
-                            repositories.push(item.repository);
+                while collected < RESULTS_PER_QUERY {
+                    let next: Option<Page<models::CodeSearchResultItem>> =
+                        self.client.get_page(&page.next).await?;
+                    match next {
+                        Some(p) => {
+                            for item in &p.items {
+                                if collected >= RESULTS_PER_QUERY {
+                                    break;
+                                }
+                                collected += 1;
+                                let repo = item.repository.clone();
+                                if let Some(key) = repo.full_name.clone() {
+                                    if !key.is_empty() && seen.insert(key) {
+                                        repositories.push(repo);
+                                    }
+                                }
+                            }
+                            page = p;
                         }
-                        if collected >= RESULTS_PER_QUERY {
-                            break;
-                        }
+                        None => break,
                     }
                 }
             }
@@ -142,21 +111,53 @@ impl GithubScanner {
 
         let mut out = Vec::with_capacity(repositories.len());
         for (index, repo) in repositories.into_iter().enumerate() {
-            out.push(self.to_discovery(repo, index < ENRICHMENT_LIMIT).await?);
+            let enrich = index < ENRICHMENT_LIMIT;
+
+            // For enriched repos, fetch full metadata from /repos/{owner}/{repo}
+            let repo = if enrich {
+                let owner = repo
+                    .owner
+                    .as_ref()
+                    .map(|o| o.login.clone())
+                    .unwrap_or_default();
+                let name = repo.name.clone();
+
+                if !owner.is_empty() && !name.is_empty() {
+                    match self.client.repos(&owner, &name).get().await {
+                        Ok(full) => full,
+                        Err(_) => repo, // fall back to reduced data on failure
+                    }
+                } else {
+                    repo
+                }
+            } else {
+                repo
+            };
+
+            out.push(self.to_discovery(repo, enrich).await?);
         }
         Ok(out)
     }
 
-    async fn to_discovery(&self, repo: Repo, enrich: bool) -> Result<ProjectDiscovery> {
-        let readme = if enrich {
-            self.fetch_readme(&repo.owner.login, &repo.name).await.ok()
+    async fn to_discovery(
+        &self,
+        repo: models::Repository,
+        enrich: bool,
+    ) -> Result<ProjectDiscovery> {
+        let owner = repo
+            .owner
+            .as_ref()
+            .map(|o| o.login.clone())
+            .unwrap_or_default();
+        let name = repo.name.clone();
+
+        let readme = if enrich && !owner.is_empty() && !name.is_empty() {
+            self.fetch_readme(&owner, &name).await.ok()
         } else {
             None
         };
-        let code_file = if enrich {
-            self.fetch_code_file(&repo.owner.login, &repo.name, "README.md")
-                .await
-                .ok()
+        let code_file = if enrich && !owner.is_empty() && !name.is_empty() {
+            self.fetch_code_file(&owner, &name, "README.md").await.ok()
         } else {
             None
         };
@@ -165,6 +166,7 @@ impl GithubScanner {
             .or(code_file.as_deref())
             .unwrap_or_default()
             .to_lowercase();
+
         let mut terms = Vec::new();
         for term in [
             "api", "rest", "graphql", "openapi", "swagger", "endpoint", "webhook",
@@ -180,25 +182,34 @@ impl GithubScanner {
                 terms.push(term.into());
             }
         }
+
         let mut stack = Vec::new();
         if let Some(language) = &repo.language {
             stack.push(language.clone());
         }
-        stack.extend(
-            repo.topics
-                .iter()
-                .filter(|topic| text.contains(topic.as_str()))
-                .cloned(),
-        );
+        if let Some(topics) = &repo.topics {
+            for topic in topics {
+                if text.contains(topic.as_str()) {
+                    stack.push(topic.clone());
+                }
+            }
+        }
+
+        let full_name = repo
+            .full_name
+            .clone()
+            .unwrap_or_else(|| format!("{}/{}", owner, name));
+        let html_url = repo.html_url.to_string();
+
         Ok(ProjectDiscovery {
-            id: repo.full_name.clone(),
-            name: repo.full_name,
-            repository_url: repo.html_url,
-            description: repo.description,
+            id: full_name.clone(),
+            name: full_name,
+            repository_url: html_url,
+            description: repo.description.clone(),
             discovered_at: chrono::Utc::now(),
             last_updated: None,
-            stars: repo.stargazers_count as u32,
-            forks: repo.forks_count as u32,
+            stars: repo.stargazers_count.unwrap_or(0) as u32,
+            forks: repo.forks_count.unwrap_or(0) as u32,
             tech_stack: if stack.is_empty() {
                 terms.clone()
             } else {
@@ -214,78 +225,42 @@ impl GithubScanner {
     }
 
     pub async fn fetch_readme(&self, owner: &str, repo: &str) -> Result<String> {
-        let content: Content = self
-            .request_json(format!("{API}/repos/{owner}/{repo}/readme"))
+        let readme = self
+            .client
+            .repos(owner, repo)
+            .get_readme()
+            .send()
             .await?;
-        decode(content)
+        match readme.content {
+            Some(encoded) => {
+                let cleaned: String = encoded.chars().filter(|c| !c.is_whitespace()).collect();
+                let bytes = base64::engine::general_purpose::STANDARD.decode(&cleaned)?;
+                Ok(String::from_utf8_lossy(&bytes).into_owned())
+            }
+            None => Ok(String::new()),
+        }
     }
 
     pub async fn fetch_code_file(&self, owner: &str, repo: &str, path: &str) -> Result<String> {
-        let content: Content = self
-            .request_json(format!("{API}/repos/{owner}/{repo}/contents/{path}"))
+        let content = self
+            .client
+            .repos(owner, repo)
+            .get_content()
+            .path(path)
+            .send()
             .await?;
-        decode(content)
-    }
-
-    async fn request(&self, url: String) -> Result<reqwest::Response> {
-        for attempt in 0..5 {
-            let response = self.client.get(&url).send().await?;
-            if response.status().is_success() {
-                return Ok(response);
+        let first = content
+            .items
+            .into_iter()
+            .next()
+            .ok_or_else(|| anyhow!("no content for {}", path))?;
+        match first.content {
+            Some(encoded) => {
+                let cleaned: String = encoded.chars().filter(|c| !c.is_whitespace()).collect();
+                let bytes = base64::engine::general_purpose::STANDARD.decode(&cleaned)?;
+                Ok(String::from_utf8_lossy(&bytes).into_owned())
             }
-            let status = response.status();
-            let text = response.text().await?;
-            if status.as_u16() == 403 || status.as_u16() == 429 {
-                if attempt == 4 {
-                    return Err(anyhow!(
-                        "GitHub API rate limit exceeded ({}). Reduce scan limits or wait and retry. Body: {}",
-                        status,
-                        truncate(&text, 200)
-                    ));
-                }
-                sleep(Duration::from_secs(2u64.pow(attempt))).await;
-                continue;
-            }
-            return Err(anyhow!(
-                "GitHub API error ({}): {}",
-                status,
-                truncate(&text, 300)
-            ));
+            None => Ok(String::new()),
         }
-        Err(anyhow!("GitHub API request failed after retries"))
     }
-
-    async fn request_json<T: DeserializeOwned>(&self, url: String) -> Result<T> {
-        let response = self.request(url).await?;
-        let status = response.status();
-        let text = response.text().await?;
-        if !status.is_success() {
-            return Err(anyhow!(
-                "GitHub API error ({}): {}",
-                status,
-                truncate(&text, 300)
-            ));
-        }
-        serde_json::from_str(&text).map_err(|error| {
-            anyhow!(
-                "Failed to parse GitHub response: {} — body: {}",
-                error,
-                truncate(&text, 500)
-            )
-        })
-    }
-}
-
-fn truncate(value: &str, max_chars: usize) -> String {
-    value.chars().take(max_chars).collect()
-}
-
-fn decode(content: Content) -> Result<String> {
-    if content.encoding != "base64" {
-        return Err(anyhow!("Unsupported encoding"));
-    }
-    Ok(String::from_utf8_lossy(
-        &base64::engine::general_purpose::STANDARD.decode(content.content.replace('\n', ""))?,
-    )
-    .to_string())
 }
