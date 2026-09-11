@@ -142,4 +142,3 @@ impl Drop for ScanReset<'_> {
         self.0.store(false, Ordering::SeqCst);
     }
 }
-

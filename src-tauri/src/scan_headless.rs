@@ -383,4 +383,3 @@ fn provider_for_pattern(pattern_name: &str) -> Option<String> {
     };
     Some(provider.into())
 }
-
