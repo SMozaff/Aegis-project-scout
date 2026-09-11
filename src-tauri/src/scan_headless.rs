@@ -85,23 +85,7 @@ pub async fn run_scan_headless(
             Some(repository_name.clone()),
         );
 
-        let (owner, repo) = repository
-            .repository_url
-            .trim_end_matches('/')
-            .rsplit_once("/repos/")
-            .map(|(owner, repo)| (owner.to_string(), repo.to_string()))
-            .or_else(|| {
-                repository
-                    .repository_url
-                    .trim_end_matches('/')
-                    .rsplit_once('/')
-                    .map(|(owner, repo)| {
-                        (
-                            owner.rsplit('/').next().unwrap_or(owner).to_string(),
-                            repo.to_string(),
-                        )
-                    })
-            })
+        let (owner, repo) = split_owner_repo(&repository.repository_url, &repository.name)
             .ok_or_else(|| {
                 format!(
                     "Unable to determine owner/repository for {}",
@@ -333,6 +317,41 @@ fn emit_progress(
             repository,
         });
     }
+}
+
+/// Extract `(owner, repo)` from a GitHub URL or a `owner/repo` fallback.
+///
+/// Handles:
+/// - `https://github.com/{owner}/{repo}` (web URL, produced by octocrab's `html_url`)
+/// - `https://api.github.com/repos/{owner}/{repo}` (API URL, if ever encountered)
+/// - `{owner}/{repo}` (bare full name from the discovery record)
+fn split_owner_repo(repository_url: &str, fallback_full_name: &str) -> Option<(String, String)> {
+    let trimmed = repository_url.trim_end_matches('/');
+
+    // API URL: https://api.github.com/repos/{owner}/{repo}
+    if let Some((_, tail)) = trimmed.rsplit_once("/repos/") {
+        let mut parts = tail.splitn(2, '/');
+        let owner = parts.next().unwrap_or("");
+        let repo = parts.next().unwrap_or("");
+        if !owner.is_empty() && !repo.is_empty() {
+            return Some((owner.to_string(), repo.to_string()));
+        }
+    }
+
+    // Web URL: https://github.com/{owner}/{repo}
+    let mut segments = trimmed.rsplit('/');
+    let repo = segments.next().unwrap_or("");
+    let owner = segments.next().unwrap_or("");
+    if !owner.is_empty() && !repo.is_empty() && !repo.contains(':') {
+        return Some((owner.to_string(), repo.to_string()));
+    }
+
+    // Fallback: use the discovery record's full name (owner/repo)
+    if let Some((owner, repo)) = fallback_full_name.split_once('/') {
+        return Some((owner.to_string(), repo.to_string()));
+    }
+
+    None
 }
 
 fn provider_for_pattern(pattern_name: &str) -> Option<String> {
