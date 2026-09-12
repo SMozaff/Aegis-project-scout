@@ -66,7 +66,31 @@ impl GithubScanner {
                     .code(&search_query)
                     .per_page(RESULTS_PER_QUERY as u8)
                     .send()
-                    .await?;
+                    .await
+                    .map_err(|e| {
+                        let display = format!("{}", e);
+                        let detail = if display.is_empty() || display == "GitHub" {
+                            format!("{:?}", e)
+                        } else {
+                            display
+                        };
+                        if detail.contains("403")
+                            || detail.contains("429")
+                            || detail.to_lowercase().contains("rate limit")
+                        {
+                            anyhow!(
+                                "GitHub API rate limit hit while searching {:?}. Reduce scan limits or wait. Underlying: {}",
+                                search_query,
+                                detail
+                            )
+                        } else {
+                            anyhow!(
+                                "GitHub code search failed for query {:?}: {}",
+                                search_query,
+                                detail
+                            )
+                        }
+                    })?;
 
                 for item in &page.items {
                     if collected >= RESULTS_PER_QUERY {
@@ -82,7 +106,16 @@ impl GithubScanner {
                 }
 
                 while collected < RESULTS_PER_QUERY {
-                    let next: Option<Page<models::Code>> = self.client.get_page(&page.next).await?;
+                    let next: Option<Page<models::Code>> =
+                        self.client.get_page(&page.next).await.map_err(|e| {
+                            let display = format!("{}", e);
+                            let detail = if display.is_empty() || display == "GitHub" {
+                                format!("{:?}", e)
+                            } else {
+                                display
+                            };
+                            anyhow!("GitHub pagination fetch failed: {}", detail)
+                        })?;
                     match next {
                         Some(p) => {
                             for item in &p.items {
@@ -119,10 +152,20 @@ impl GithubScanner {
                 let name = repo.name.clone();
 
                 if !owner.is_empty() && !name.is_empty() {
-                    match self.client.repos(&owner, &name).get().await {
-                        Ok(full) => full,
-                        Err(_) => repo, // fall back to reduced data on failure
-                    }
+                    self.client.repos(&owner, &name).get().await.map_err(|e| {
+                        let display = format!("{}", e);
+                        let detail = if display.is_empty() || display == "GitHub" {
+                            format!("{:?}", e)
+                        } else {
+                            display
+                        };
+                        anyhow!(
+                            "GitHub repository metadata fetch failed for {}/{}: {}",
+                            owner,
+                            name,
+                            detail
+                        )
+                    })?
                 } else {
                     repo
                 }
@@ -227,7 +270,26 @@ impl GithubScanner {
     }
 
     pub async fn fetch_readme(&self, owner: &str, repo: &str) -> Result<String> {
-        let readme = self.client.repos(owner, repo).get_readme().send().await?;
+        let readme = self
+            .client
+            .repos(owner, repo)
+            .get_readme()
+            .send()
+            .await
+            .map_err(|e| {
+                let display = format!("{}", e);
+                let detail = if display.is_empty() || display == "GitHub" {
+                    format!("{:?}", e)
+                } else {
+                    display
+                };
+                anyhow!(
+                    "GitHub README fetch failed for {}/{}: {}",
+                    owner,
+                    repo,
+                    detail
+                )
+            })?;
         match readme.content {
             Some(encoded) => {
                 let cleaned: String = encoded.chars().filter(|c| !c.is_whitespace()).collect();
@@ -245,7 +307,22 @@ impl GithubScanner {
             .get_content()
             .path(path)
             .send()
-            .await?;
+            .await
+            .map_err(|e| {
+                let display = format!("{}", e);
+                let detail = if display.is_empty() || display == "GitHub" {
+                    format!("{:?}", e)
+                } else {
+                    display
+                };
+                anyhow!(
+                    "GitHub content fetch failed for {}/{} at {}: {}",
+                    owner,
+                    repo,
+                    path,
+                    detail
+                )
+            })?;
         let first = content
             .items
             .into_iter()
