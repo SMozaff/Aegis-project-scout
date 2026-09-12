@@ -80,6 +80,21 @@ impl GithubScanner {
             ];
 
             for search_query in sub_queries {
+                // Wait if the search rate limit is nearly exhausted
+                if let Ok(limits) = self.client.ratelimit().get().await {
+                    let search = limits.resources.search;
+                    if search.remaining < 3 {
+                        let now = chrono::Utc::now().timestamp() as u64;
+                        let reset = search.reset as u64;
+                        let wait = reset.saturating_sub(now).saturating_add(2).min(120);
+                        eprintln!(
+                            "[throttle] search rate limit low ({}), sleeping {}s",
+                            search.remaining, wait
+                        );
+                        tokio::time::sleep(std::time::Duration::from_secs(wait)).await;
+                    }
+                }
+
                 let mut collected = 0usize;
 
                 let mut page: Page<models::Code> = self

@@ -35,6 +35,9 @@ struct Cli {
 
     #[arg(long, default_value_t = false)]
     history: bool,
+
+    #[arg(long, default_value_t = false)]
+    deep: bool,
 }
 
 #[tokio::main]
@@ -50,6 +53,7 @@ async fn main() {
         health_check: defaults.health_check,
         max_files_per_repository: defaults.max_files_per_repository,
         scan_history: cli.history,
+        scan_deep: cli.deep,
     };
 
     let counter = Arc::new(AtomicU32::new(0));

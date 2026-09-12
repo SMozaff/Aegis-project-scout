@@ -44,6 +44,9 @@ pub struct ScanConfig {
     /// Walk git history for deleted/modified credential files.
     #[serde(default)]
     pub scan_history: bool,
+    /// Run all credential-literal search queries (slower, more rate-limit-hungry)
+    #[serde(default)]
+    pub scan_deep: bool,
 }
 
 fn default_true() -> bool {
