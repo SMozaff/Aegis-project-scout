@@ -194,10 +194,9 @@ mod tests {
 #[test]
 fn detects_openai_project_key() {
     let analyzer = PatternAnalyzer::load_default().unwrap();
-    // sk-proj- followed by 65+ chars (regex requires {60,})
-    let line = "OPENAI_API_KEY=sk-proj-";
-    line.push_str(&"a".repeat(65));
-    let matches = analyzer.analyze("test.env", line);
+    // sk-proj- followed by 65 chars (regex requires {60,})
+    let line = format!("OPENAI_API_KEY=sk-proj-{}", "a".repeat(65));
+    let matches = analyzer.analyze("test.env", &line);
     assert!(
         matches.iter().any(|m| m.pattern.pattern_name.contains("openai")),
         "expected an openai match, got: {:?}",
