@@ -26,7 +26,7 @@ anyhow = "1"
 keyring = "3"
 dirs = "5"
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "charset", "http2"] }
-octocrab = { version = "0.41", default-features = false, features = ["rustls"] }
+octocrab = { version = "0.41", default-features = false, features = ["default-client", "rustls"] }
 regex = "1"
 tokio = { version = "1", features = ["macros", "net", "time", "sync"] }
 chrono = { version = "0.4", features = ["serde", "clock"] }

@@ -26,11 +26,10 @@ pub struct GithubScanner {
 
 impl GithubScanner {
     pub fn new(token: Option<String>) -> Result<Self> {
-        let mut builder = Octocrab::builder();
-        if let Some(t) = token {
-            builder = builder.personal_token(t);
-        }
-        let client = builder.build()?;
+        let client = match token {
+            Some(t) if !t.is_empty() => Octocrab::builder().personal_token(t).build()?,
+            _ => Octocrab::builder().build()?,
+        };
         Ok(Self { client })
     }
 
@@ -61,7 +60,7 @@ impl GithubScanner {
             for search_query in sub_queries {
                 let mut collected = 0usize;
 
-                let mut page: Page<models::CodeSearchResultItem> = self
+                let mut page: Page<models::Code> = self
                     .client
                     .search()
                     .code(&search_query)
@@ -83,8 +82,7 @@ impl GithubScanner {
                 }
 
                 while collected < RESULTS_PER_QUERY {
-                    let next: Option<Page<models::CodeSearchResultItem>> =
-                        self.client.get_page(&page.next).await?;
+                    let next: Option<Page<models::Code>> = self.client.get_page(&page.next).await?;
                     match next {
                         Some(p) => {
                             for item in &p.items {
@@ -183,7 +181,9 @@ impl GithubScanner {
 
         let mut stack = Vec::new();
         if let Some(language) = &repo.language {
-            stack.push(language.clone());
+            if let Some(language) = language.as_str() {
+                stack.push(language.to_owned());
+            }
         }
         if let Some(topics) = &repo.topics {
             for topic in topics {
@@ -197,7 +197,11 @@ impl GithubScanner {
             .full_name
             .clone()
             .unwrap_or_else(|| format!("{}/{}", owner, name));
-        let html_url = repo.html_url.to_string();
+        let html_url = repo
+            .html_url
+            .as_ref()
+            .map(|url| url.to_string())
+            .unwrap_or_default();
 
         Ok(ProjectDiscovery {
             id: full_name.clone(),
@@ -206,8 +210,8 @@ impl GithubScanner {
             description: repo.description.clone(),
             discovered_at: chrono::Utc::now(),
             last_updated: None,
-            stars: repo.stargazers_count.unwrap_or(0) as u32,
-            forks: repo.forks_count.unwrap_or(0) as u32,
+            stars: repo.stargazers_count.unwrap_or(0),
+            forks: repo.forks_count.unwrap_or(0),
             tech_stack: if stack.is_empty() {
                 terms.clone()
             } else {

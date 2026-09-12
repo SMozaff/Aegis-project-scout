@@ -78,7 +78,11 @@ impl PatternAnalyzer {
 
             for compiled in &self.patterns {
                 for captures in compiled.regex.captures_iter(line) {
-                    let capture_group = if captures.len() > 1 { 1 } else { 0 };
+                    let capture_group = if captures.len() > compiled.definition.extract_group {
+                        compiled.definition.extract_group
+                    } else {
+                        0
+                    };
                     let Some(raw_capture) = captures.get(capture_group) else {
                         continue;
                     };
@@ -161,6 +165,7 @@ fn normalize_health_endpoint(value: &str) -> Option<String> {
     Some(url.to_string())
 }
 
+#[allow(dead_code)]
 fn redact_url_query(value: &str) -> String {
     let Ok(mut url) = Url::parse(value) else {
         return truncate_chars(value, 320);

@@ -75,6 +75,7 @@ pub fn load_patterns() -> Result<Vec<Pattern>> {
     Ok(serde_json::from_slice(&fs::read(path)?)?)
 }
 
+#[allow(dead_code)]
 pub fn save_token(token: &str) -> Result<()> {
     let entry = Entry::new(SERVICE, TOKEN_KEY)?;
     entry.set_password(token)?;

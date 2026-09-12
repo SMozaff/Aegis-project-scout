@@ -70,7 +70,7 @@ pub async fn validate_github_token(token: String) -> Result<TokenValidation, Str
         .get()
         .await
         .ok()
-        .map(|limits| limits.resources.core.remaining);
+        .map(|limits| limits.resources.core.remaining as u64);
 
     Ok(TokenValidation {
         authenticated: true,
