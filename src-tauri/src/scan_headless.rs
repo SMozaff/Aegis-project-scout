@@ -128,7 +128,7 @@ pub async fn run_scan_headless(
         }
 
         if config.scan_history {
-            let history_budget: usize = 5; // files per repo, keep small
+            let history_budget: usize = MAX_HISTORY_READS_PER_REPO; // files per repo, keep small
             for file_path in repository.matched_file_paths.iter().take(history_budget) {
                 if scanned_files >= allocated_file_reads + history_budget {
                     break;

@@ -189,7 +189,6 @@ fn truncate_chars(value: &str, limit: usize) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::Pattern;
 
 #[test]
 fn detects_openai_project_key() {
