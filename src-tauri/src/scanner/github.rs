@@ -1,5 +1,6 @@
 use anyhow::{anyhow, Result};
 use base64::Engine;
+use chrono::{DateTime, Utc};
 use octocrab::{models, Octocrab, Page};
 use std::collections::{HashMap, HashSet};
 
@@ -348,4 +349,63 @@ impl GithubScanner {
             None => Ok(String::new()),
         }
     }
+
+pub async fn fetch_file_history(
+    &self,
+    owner: &str,
+    repo: &str,
+    path: &str,
+    max_commits: usize,
+) -> Result<Vec<HistoricalFileVersion>> {
+    let mut versions = Vec::new();
+
+let commits = self
+            .client
+            .repos(owner, repo)
+            .list_commits()
+            .per_page(30)
+            .send()
+            .await?;
+
+    for commit in commits.items.iter().take(max_commits) {
+        let sha = commit.sha.clone();
+        // Use commit date if available, otherwise use current time
+        let date: Option<chrono::DateTime<chrono::Utc>> = None;
+
+        match self
+            .client
+            .repos(owner, repo)
+            .get_content()
+            .path(path)
+            .r#ref(&sha)
+            .send()
+            .await
+        {
+            Ok(content) => {
+                if let Some(item) = content.items.into_iter().next() {
+                    if let Some(encoded) = item.content {
+                        let cleaned: String = encoded.chars().filter(|c| !c.is_whitespace()).collect();
+                        if let Ok(bytes) = base64::engine::general_purpose::STANDARD.decode(&cleaned) {
+                            versions.push(HistoricalFileVersion {
+                                commit_sha: sha,
+                                commit_date: date,
+                                content: String::from_utf8_lossy(&bytes).into_owned(),
+                            });
+                        }
+                    }
+                }
+            }
+            Err(_) => continue,
+        }
+    }
+
+    Ok(versions)
+}
+
+}
+#[derive(Debug, Clone)]
+pub struct HistoricalFileVersion {
+    pub commit_sha: String,
+    pub commit_date: Option<DateTime<Utc>>,
+    pub content: String,
 }

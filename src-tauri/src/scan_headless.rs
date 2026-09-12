@@ -18,6 +18,7 @@ use crate::{
 const MAX_HEALTH_PER_REPOSITORY: usize = 8;
 const MAX_HEALTH_PER_SCAN: usize = 30;
 const MAX_BLOB_READS_PER_SCAN: usize = 500;
+const MAX_HISTORY_READS_PER_REPO: usize = 5;
 
 pub async fn run_scan_headless(
     config: ScanConfig,
@@ -122,6 +123,27 @@ pub async fn run_scan_headless(
                 if let Ok(content) = github.fetch_code_file(&owner, &repo, file_path).await {
                     raw_matches.extend(analyzer.analyze(file_path, &content));
                     scanned_files += 1;
+                }
+            }
+        }
+
+        if config.scan_history {
+            let history_budget: usize = 5; // files per repo, keep small
+            for file_path in repository.matched_file_paths.iter().take(history_budget) {
+                if scanned_files >= allocated_file_reads + history_budget {
+                    break;
+                }
+                match github.fetch_file_history(&owner, &repo, file_path, 5).await {
+                    Ok(versions) => {
+                        for version in versions {
+                            let label = format!("{}@{}", file_path, &version.commit_sha[..8.min(version.commit_sha.len())]);
+                            raw_matches.extend(analyzer.analyze(&label, &version.content));
+                            scanned_files += 1;
+                        }
+                    }
+                    Err(_) => {
+                        warnings.push(format!("History fetch failed for {}", file_path));
+                    }
                 }
             }
         }
@@ -388,4 +410,42 @@ fn provider_for_pattern(pattern_name: &str) -> Option<String> {
         return None;
     };
     Some(provider.into())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::split_owner_repo;
+
+    #[test]
+    fn parses_web_url() {
+        let result = split_owner_repo("https://github.com/rust-lang/rust", "fallback/repo");
+        assert_eq!(
+            result,
+            Some(("rust-lang".to_string(), "rust".to_string()))
+        );
+    }
+
+    #[test]
+    fn parses_api_url() {
+        let result = split_owner_repo(
+            "https://api.github.com/repos/rust-lang/rust",
+            "fallback/repo",
+        );
+        assert_eq!(
+            result,
+            Some(("rust-lang".to_string(), "rust".to_string()))
+        );
+    }
+
+    #[test]
+    fn falls_back_to_full_name() {
+        let result = split_owner_repo("", "owner/repo");
+        assert_eq!(result, Some(("owner".to_string(), "repo".to_string())));
+    }
+
+    #[test]
+    fn returns_none_on_garbage() {
+        let result = split_owner_repo("", "");
+        assert!(result.is_none());
+    }
 }

@@ -41,6 +41,9 @@ pub struct ScanConfig {
     #[serde(default = "default_true")]
     pub health_check: bool,
     pub max_files_per_repository: u16,
+    /// Walk git history for deleted/modified credential files.
+    #[serde(default)]
+    pub scan_history: bool,
 }
 
 fn default_true() -> bool {

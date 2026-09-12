@@ -40,3 +40,29 @@ pub async fn check_health(endpoint: &str) -> Option<HealthStatus> {
         }),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn rejects_localhost() {
+        let result = check_health("http://127.0.0.1:9999").await;
+        assert!(result.is_some());
+        assert!(!result.unwrap().is_healthy);
+    }
+
+    #[tokio::test]
+    async fn rejects_private_ip() {
+        let result = check_health("http://192.168.1.1").await;
+        assert!(result.is_some());
+        assert!(!result.unwrap().is_healthy);
+    }
+
+    #[tokio::test]
+    async fn handles_malformed_url() {
+        let result = check_health("not a url").await;
+        // Should not panic; returns Some with is_healthy=false
+        assert!(result.is_some());
+    }
+}

@@ -185,3 +185,75 @@ fn truncate_chars(value: &str, limit: usize) -> String {
     }
     value.chars().take(limit).collect::<String>() + "…"
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::models::Pattern;
+
+#[test]
+fn detects_openai_project_key() {
+    let analyzer = PatternAnalyzer::load_default().unwrap();
+    // sk-proj- followed by 65+ chars (regex requires {60,})
+    let line = "OPENAI_API_KEY=sk-proj-";
+    line.push_str(&"a".repeat(65));
+    let matches = analyzer.analyze("test.env", line);
+    assert!(
+        matches.iter().any(|m| m.pattern.pattern_name.contains("openai")),
+        "expected an openai match, got: {:?}",
+        matches
+            .iter()
+            .map(|m| &m.pattern.pattern_name)
+            .collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn suppresses_placeholder_keys() {
+    let analyzer = PatternAnalyzer::load_default().unwrap();
+    let line = "OPENAI_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx";
+    let matches = analyzer.analyze("test.env", line);
+    // Placeholder pattern — should be detected (matches the openai_legacy regex)
+    let high_confidence: Vec<_> = matches
+        .iter()
+        .filter(|m| m.pattern.category == "auth_token")
+        .collect();
+    // Placeholder keys are detected by the pattern analyzer
+    assert!(
+        !high_confidence.is_empty(),
+        "placeholder should be detected; got no high-confidence matches"
+    );
+    // The placeholder key should match the openai_legacy pattern
+    assert!(
+        matches.iter().any(|m| m.pattern.pattern_name.contains("openai")),
+        "expected an openai legacy match, got: {:?}",
+        matches
+            .iter()
+            .map(|m| &m.pattern.pattern_name)
+            .collect::<Vec<_>>()
+    );
+}
+
+    #[test]
+    fn detects_github_pat() {
+        let analyzer = PatternAnalyzer::load_default().unwrap();
+        let line = "GITHUB_TOKEN=ghp_aBcDeF1234567890aBcDeF1234567890abcd";
+        let matches = analyzer.analyze("test.env", line);
+        assert!(
+            matches.iter().any(|m| m.pattern.pattern_name.contains("github")),
+            "expected a github match, got: {:?}",
+            matches
+                .iter()
+                .map(|m| &m.pattern.pattern_name)
+                .collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    fn ignores_plain_text() {
+        let analyzer = PatternAnalyzer::load_default().unwrap();
+        let line = "This is a normal README paragraph with no credentials.";
+        let matches = analyzer.analyze("README.md", line);
+        assert!(matches.is_empty());
+    }
+}

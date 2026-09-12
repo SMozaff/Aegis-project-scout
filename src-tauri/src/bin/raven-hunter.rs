@@ -32,6 +32,9 @@ struct Cli {
 
     #[arg(long, default_value_t = false)]
     quiet: bool,
+
+    #[arg(long, default_value_t = false)]
+    history: bool,
 }
 
 #[tokio::main]
@@ -46,10 +49,14 @@ async fn main() {
         max_repositories: cli.max_results.min(u16::MAX as u32) as u16,
         health_check: defaults.health_check,
         max_files_per_repository: defaults.max_files_per_repository,
+        scan_history: cli.history,
     };
 
     let counter = Arc::new(AtomicU32::new(0));
     let quiet = cli.quiet;
+    if cli.history && !cli.quiet {
+        eprintln!("[info] History mode enabled — scanning deleted and historical files");
+    }
     let progress_callback = Box::new(move |progress: ScanProgress| {
         if !quiet {
             eprintln!(
