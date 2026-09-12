@@ -111,10 +111,16 @@ pub async fn run_scan_headless(
             warnings.push("Per-scan GitHub blob-read budget reached; no additional source blobs were fetched.".into());
         }
 
-        if allocated_file_reads > 1 {
-            if let Ok(code) = github.fetch_code_file(&owner, &repo, "README.md").await {
-                if scanned_files == 0 {
-                    raw_matches.extend(analyzer.analyze("README.md", &code));
+        if allocated_file_reads > 0 {
+            for file_path in &repository.matched_file_paths {
+                if scanned_files >= allocated_file_reads {
+                    break;
+                }
+                if file_path == "README.md" {
+                    continue;
+                }
+                if let Ok(content) = github.fetch_code_file(&owner, &repo, file_path).await {
+                    raw_matches.extend(analyzer.analyze(file_path, &content));
                     scanned_files += 1;
                 }
             }

@@ -18,6 +18,7 @@ pub struct ProjectDiscovery {
     pub confidence_score: f64,
     pub evidence: String,
     pub source_file: Option<String>,
+    pub matched_file_paths: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

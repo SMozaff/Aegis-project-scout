@@ -1,7 +1,7 @@
 use anyhow::{anyhow, Result};
 use base64::Engine;
 use octocrab::{models, Octocrab, Page};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use crate::models::project::ProjectDiscovery;
 
@@ -49,6 +49,7 @@ impl GithubScanner {
 
         let mut repositories: Vec<models::Repository> = Vec::new();
         let mut seen: HashSet<String> = HashSet::new();
+        let mut repo_paths: HashMap<String, Vec<String>> = HashMap::new();
 
         for technology in technologies {
             let sub_queries = [
@@ -99,8 +100,14 @@ impl GithubScanner {
                     collected += 1;
                     let repo = item.repository.clone();
                     if let Some(key) = repo.full_name.clone() {
-                        if !key.is_empty() && seen.insert(key) {
-                            repositories.push(repo);
+                        if !key.is_empty() && seen.insert(key.clone()) {
+                            repositories.push(repo.clone());
+                        }
+                        if !item.path.is_empty() {
+                            let paths = repo_paths.entry(key).or_default();
+                            if !paths.contains(&item.path) {
+                                paths.push(item.path.clone());
+                            }
                         }
                     }
                 }
@@ -125,8 +132,14 @@ impl GithubScanner {
                                 collected += 1;
                                 let repo = item.repository.clone();
                                 if let Some(key) = repo.full_name.clone() {
-                                    if !key.is_empty() && seen.insert(key) {
-                                        repositories.push(repo);
+                                    if !key.is_empty() && seen.insert(key.clone()) {
+                                        repositories.push(repo.clone());
+                                    }
+                                    if !item.path.is_empty() {
+                                        let paths = repo_paths.entry(key).or_default();
+                                        if !paths.contains(&item.path) {
+                                            paths.push(item.path.clone());
+                                        }
                                     }
                                 }
                             }
@@ -173,7 +186,12 @@ impl GithubScanner {
                 repo
             };
 
-            out.push(self.to_discovery(repo, enrich).await?);
+            let matched_file_paths = repo
+                .full_name
+                .as_ref()
+                .and_then(|full_name| repo_paths.remove(full_name))
+                .unwrap_or_default();
+            out.push(self.to_discovery(repo, enrich, matched_file_paths).await?);
         }
         Ok(out)
     }
@@ -182,6 +200,7 @@ impl GithubScanner {
         &self,
         repo: models::Repository,
         enrich: bool,
+        matched_file_paths: Vec<String>,
     ) -> Result<ProjectDiscovery> {
         let owner = repo
             .owner
@@ -266,6 +285,7 @@ impl GithubScanner {
             evidence: "Collected from public GitHub code-search results and repository metadata"
                 .into(),
             source_file: None,
+            matched_file_paths,
         })
     }
 
