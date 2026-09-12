@@ -54,9 +54,29 @@ impl GithubScanner {
 
         for technology in technologies {
             let sub_queries = [
+                // OpenAI
+                format!("\"sk-proj-\" in:file"),
+                format!("\"sk-svcacct-\" in:file"),
+                // Anthropic
+                format!("\"sk-ant-api03-\" in:file"),
+                // GitHub PATs
+                format!("\"ghp_\" in:file"),
+                format!("\"github_pat_\" in:file"),
+                // AWS
+                format!("\"AKIA\" in:file"),
+                format!("\"aws_secret_access_key\" in:file"),
+                // Google
+                format!("\"AIza\" in:file"),
+                // Slack
+                format!("\"xoxb-\" in:file"),
+                format!("\"xoxp-\" in:file"),
+                // Stripe
+                format!("\"sk_live_\" in:file"),
+                // SendGrid
+                format!("\"SG.\" extension:env OR extension:yml OR extension:json"),
+                // Technology-scoped fallback
                 format!("\"{technology}\" in:file filename:.env"),
-                format!("\"{technology}\" in:file filename:config"),
-                format!("\"{technology}\" extension:yml OR extension:yaml OR extension:json token"),
+                format!("\"{technology}\" in:file filename:credentials"),
             ];
 
             for search_query in sub_queries {
