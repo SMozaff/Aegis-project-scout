@@ -214,16 +214,7 @@ impl GithubScanner {
         } else {
             None
         };
-        let code_file = if enrich && !owner.is_empty() && !name.is_empty() {
-            self.fetch_code_file(&owner, &name, "README.md").await.ok()
-        } else {
-            None
-        };
-        let text = readme
-            .as_deref()
-            .or(code_file.as_deref())
-            .unwrap_or_default()
-            .to_lowercase();
+        let text = readme.as_deref().unwrap_or_default().to_lowercase();
 
         let mut terms = Vec::new();
         for term in [
