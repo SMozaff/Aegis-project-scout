@@ -1,10 +1,17 @@
 import { useState } from "react";
 import type { AppSettings, ScanProgress } from "../types";
 
+interface RunOptions {
+  health_check: boolean;
+  verify_credentials: boolean;
+  scan_deep: boolean;
+  scan_history: boolean;
+}
+
 interface ScannerConfigProps {
   settings: AppSettings;
   onChange: (settings: AppSettings) => void;
-  onRun: (options: { health_check: boolean; verify_credentials: boolean }) => Promise<void>;
+  onRun: (options: RunOptions) => Promise<void>;
   running: boolean;
   progress: ScanProgress | null;
   tokenConfigured: boolean;
@@ -20,8 +27,9 @@ export function ScannerConfig({
   progress,
   tokenConfigured,
 }: ScannerConfigProps) {
-  const [webSearch, setWebSearch] = useState(false);
   const [verifyCredentials, setVerifyCredentials] = useState(true);
+  const [historyScan, setHistoryScan] = useState(false);
+  const [deepScan, setDeepScan] = useState(false);
 
   const update = (changes: Partial<AppSettings>) => onChange({ ...settings, ...changes });
   const toggleLanguage = (language: string) => {
@@ -60,12 +68,22 @@ export function ScannerConfig({
           <label className="mt-5 flex items-center gap-3 text-sm text-slate-700">
             <input
               type="checkbox"
-              checked={webSearch}
-              onChange={(event) => setWebSearch(event.target.checked)}
+              checked={historyScan}
+              onChange={(event) => setHistoryScan(event.target.checked)}
               className="accent-sky-500"
             />
-            Enable optional web search
-            <span className="text-xs text-slate-600">(not included in the current backend payload)</span>
+            Scan git history for deleted or modified files
+            <span className="text-xs text-slate-600">(slower; raises GitHub API usage)</span>
+          </label>
+          <label className="mt-3 flex items-center gap-3 text-sm text-slate-700">
+            <input
+              type="checkbox"
+              checked={deepScan}
+              onChange={(event) => setDeepScan(event.target.checked)}
+              className="accent-sky-500"
+            />
+            Deep scan (all credential patterns)
+            <span className="text-xs text-slate-600">(more API quota: ~10 queries per technology)</span>
           </label>
         </div>
 
@@ -138,7 +156,14 @@ export function ScannerConfig({
           type="button"
           className="button-primary min-w-32"
           disabled={running}
-          onClick={() => void onRun({ health_check: settings.health_check, verify_credentials: verifyCredentials })}
+          onClick={() =>
+            void onRun({
+              health_check: settings.health_check,
+              verify_credentials: verifyCredentials,
+              scan_deep: deepScan,
+              scan_history: historyScan,
+            })
+          }
         >
           {running ? "Scanning…" : "Run Scan"}
         </button>

@@ -1,6 +1,6 @@
 # Raven Hunter
 
-Raven API Hunter is a Tauri v2 desktop application for developer security hygiene. It monitors **public GitHub repositories** for API endpoint and route patterns, performs bounded non-invasive responsiveness checks, presents project metrics in a React dashboard, and exports findings for compliance review.
+Raven API Hunter is a Tauri v2 desktop application for developer security hygiene. It monitors **public GitHub repositories** for leaked API credentials and endpoint/route patterns, performs bounded non-invasive responsiveness checks, presents project metrics in a React dashboard, and exports findings for compliance review.
 
 ## Scope and safety model
 
@@ -8,7 +8,8 @@ Raven is intentionally read-only and bounded:
 
 - Repository discovery uses GitHub's public repository search and Git tree/blob APIs.
 - It does not create commits, issues, branches, webhooks, pull requests, or repository changes.
-- The default analyzer looks for endpoint/API patterns only; it does not hunt for credentials.
+- The analyzer looks for credential-literal patterns (OpenAI, Anthropic, GitHub PATs, AWS, Google, Slack, Stripe, SendGrid) plus endpoint/API patterns. Entropy-based confidence scoring flags likely live keys and suppresses placeholder values.
+- Credential verification is opt-in and sends the discovered token only to the provider's official validation endpoint when the **Verify credentials** option is enabled.
 - HTTP health checks use `HEAD` only, do not follow redirects, remove URL query strings, and reject localhost, private, link-local, multicast, and common reserved/special-purpose network targets.
 - Health checks are capped at 8 endpoints per repository and 30 endpoints per scan.
 - GitHub tokens are not persisted in Raven settings and are never placed in exported reports.
@@ -29,7 +30,7 @@ Use Raven only for repositories and endpoint monitoring activities that you are 
 
 ```text
 Raven-API-Hunter/
-├── src/
+├── src/                                  # React frontend
 │   ├── components/
 │   │   ├── Dashboard.tsx
 │   │   ├── ResultsDisplay.tsx
@@ -43,19 +44,24 @@ Raven-API-Hunter/
 ├── src-tauri/
 │   ├── capabilities/default.json
 │   ├── patterns/default_patterns.json
-│   ├── src/
-│   │   ├── commands.rs
-│   │   ├── config.rs
-│   │   ├── export.rs
-│   │   ├── github.rs
-│   │   ├── health.rs
-│   │   ├── lib.rs
-│   │   ├── main.rs
-│   │   ├── models.rs
-│   │   └── patterns.rs
-│   ├── build.rs
-│   ├── Cargo.toml
-│   └── tauri.conf.json
+│   └── src/
+│       ├── commands.rs                   # Tauri IPC commands
+│       ├── export.rs
+│       ├── lib.rs
+│       ├── main.rs
+│       ├── models/
+│       │   ├── mod.rs                    # AppSettings / ScanConfig
+│       │   ├── endpoint.rs
+│       │   ├── pattern.rs
+│       │   └── project.rs
+│       ├── scan_headless.rs              # shared scan pipeline (GUI + CLI)
+│       ├── scanner/
+│       │   ├── github.rs                 # GitHub discovery + credential search + history
+│       │   ├── health_checker.rs
+│       │   ├── pattern_analyzer.rs       # regex + entropy confidence scoring
+│       │   └── verify.rs                 # provider credential verification
+│       └── utils/config.rs               # persisted non-secret settings
+├── src-tauri/src/bin/raven-hunter.rs     # headless CLI
 ├── package.json
 ├── tailwind.config.js
 ├── tsconfig.json
@@ -134,6 +140,33 @@ For public repository monitoring, use the least privilege available. Raven only 
 
 Results stream into the **Results** view as each repository completes. The dashboard is populated with final metrics when the scan finishes.
 
+The **Deep scan** option runs all credential-literal search queries (about 10 per technology) instead of the fast three-query default. The **Scan git history** option walks recent commits for deleted or modified copies of matched files.
+
+## Headless CLI
+
+The same scan pipeline is available as a standalone binary for scripting and CI:
+
+```bash
+cd src-tauri
+cargo run --bin raven-hunter -- --token "$GH_TOKEN" --tech openai,aws --lookback 30
+```
+
+Options:
+
+| Flag | Description |
+|------|-------------|
+| `--token <TOKEN>` / `GH_TOKEN` env | GitHub token for repository search |
+| `--tech <TECH>` | Comma-separated technologies (default `openai`) |
+| `--lookback <DAYS>` | Search lookback window (default `30`) |
+| `--max-results <N>` | Repository result limit (default `30`) |
+| `--verify` | Verify credentials against provider APIs |
+| `--history` | Walk git history for deleted/modified files |
+| `--deep` | Run all credential-literal search queries |
+| `--output <FILE>` | Report output path (default `raven-report.json`) |
+| `--quiet` | Suppress progress output |
+
+The CLI applies the same rate-limit throttling as the GUI: a 5-second minimum spacing between GitHub code-search queries, low-quota backoff, and automatic retry on 403/429 responses.
+
 ### Discovery behavior
 
 For each selected language, Raven searches for recently pushed public, non-archived, non-fork repositories. It then requests the repository's recursive Git tree and prioritizes likely API/configuration files, including names containing terms such as:
@@ -152,13 +185,23 @@ Large/binary/generated/vendor files are skipped.
 
 ## Default pattern definitions
 
-Patterns live in:
+Credential detection combines GitHub code-search queries with regex patterns. Patterns live in:
 
 ```text
 src-tauri/patterns/default_patterns.json
 ```
 
-The included definitions detect examples such as:
+The included credential patterns identify examples such as:
+
+- OpenAI project/service keys (`sk-proj-`, `sk-svcacct-`, `sk-ant-api03-`)
+- GitHub personal access tokens (`ghp_`, `github_pat_`)
+- AWS access keys (`AKIA...`, `aws_secret_access_key`)
+- Google API keys (`AIza`)
+- Slack tokens (`xoxb-`, `xoxp-`)
+- Stripe live keys (`sk_live_`)
+- SendGrid API keys (`SG.`)
+
+The endpoint definitions detect examples such as:
 
 - Absolute HTTP(S) URLs
 - OpenAPI/server/base-URL declarations

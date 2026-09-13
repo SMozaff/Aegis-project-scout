@@ -76,7 +76,12 @@ function App() {
 
   const tokenConfigured = useMemo(() => token.trim().length > 0, [token]);
 
-  const runScan = async (options: { health_check: boolean; verify_credentials: boolean }) => {
+  const runScan = async (options: {
+    health_check: boolean;
+    verify_credentials: boolean;
+    scan_deep: boolean;
+    scan_history: boolean;
+  }) => {
     setRunning(true);
     setError(null);
     setExportMessage(null);

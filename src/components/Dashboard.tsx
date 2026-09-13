@@ -28,10 +28,10 @@ export function Dashboard({ report, liveFindings, running }: DashboardProps) {
       <div className="flex items-end justify-between">
         <div>
           <div className="label">Overview</div>
-          <h1 className="mt-2 text-3xl font-semibold text-slate-900">Project exposure dashboard</h1>
+          <h1 className="mt-2 text-3xl font-semibold text-slate-900">Credential exposure dashboard</h1>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-            Review public repositories for API endpoint patterns, then measure whether discovered
-            public HTTP endpoints respond to a safe HEAD request.
+            Scan public repositories for leaked API credentials and endpoint patterns, then measure
+            whether discovered public HTTP endpoints respond to a safe HEAD request.
           </p>
         </div>
         <div className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${running ? "border-sky-500/40 bg-sky-500/10 text-sky-700" : "border-slate-300 bg-slate-100 text-slate-600"}`}>
@@ -48,7 +48,7 @@ export function Dashboard({ report, liveFindings, running }: DashboardProps) {
         <MetricCard
           label="Pattern matches"
           value={running ? liveFindings.reduce((n, f) => n + f.matches.length, 0) : metrics?.total_matches ?? 0}
-          hint="Endpoint and route indicators"
+          hint="Matched credential and endpoint patterns"
         />
         <MetricCard
           label="Unique endpoints"
