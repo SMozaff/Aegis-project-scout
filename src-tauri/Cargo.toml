@@ -34,5 +34,6 @@ base64 = "0.22"
 csv = "1"
 url = "2"
 clap = { version = "4", features = ["derive", "env"] }
+urlencoding = "2"
 
 [profile.release]

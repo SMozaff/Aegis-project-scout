@@ -1,6 +1,6 @@
 use anyhow::{anyhow, Result};
 use base64::Engine;
-use octocrab::{models, Octocrab};
+use octocrab::Octocrab;
 use reqwest::header::{HeaderMap, HeaderValue, ACCEPT, AUTHORIZATION, USER_AGENT};
 use serde::Deserialize;
 use std::collections::{HashMap, HashSet};
@@ -21,7 +21,6 @@ pub struct GithubScanner {
     /// Octocrab client — used for metadata/README/content, where its typed
     /// models are genuinely helpful and no header inspection is required.
     client: Octocrab,
-    token: Option<String>,
 }
 
 // ---------------------------------------------------------------------------
@@ -49,10 +48,8 @@ struct CodeSearchItem {
     repository: CodeSearchRepo,
 }
 
-#[derive(Deserialize, Default)]
+#[derive(Deserialize, Default, Clone)]
 struct CodeSearchRepo {
-    #[serde(default)]
-    id: u64,
     #[serde(default)]
     name: String,
     #[serde(default)]
@@ -73,7 +70,7 @@ struct CodeSearchRepo {
     owner: CodeSearchOwner,
 }
 
-#[derive(Deserialize, Default)]
+#[derive(Deserialize, Default, Clone)]
 struct CodeSearchOwner {
     #[serde(default)]
     login: String,
@@ -115,7 +112,7 @@ impl GithubScanner {
             None => Octocrab::builder().build()?,
         };
 
-        Ok(Self { http, client, token })
+        Ok(Self { http, client })
     }
 
     // -----------------------------------------------------------------------
@@ -127,6 +124,7 @@ impl GithubScanner {
         &self,
         query: &str,
         _lookback: u32,
+        scan_deep: bool,
     ) -> Result<Vec<ProjectDiscovery>> {
         let technologies: Vec<&str> = query
             .split(" OR ")
@@ -149,6 +147,19 @@ impl GithubScanner {
             "\"AKIA\" in:file".into(),
             "\"ghp_\" in:file".into(),
         ];
+
+        if scan_deep {
+            sub_queries.extend([
+                "\"sk-ant-api03-\" in:file".into(),
+                "\"sk_live_\" in:file".into(),
+                "\"github_pat_\" in:file".into(),
+                "\"aws_secret_access_key\" in:file".into(),
+                "\"AIza\" in:file".into(),
+                "\"xoxb-\" in:file".into(),
+                "\"xoxp-\" in:file".into(),
+                "\"SG.\" extension:env OR extension:yml OR extension:json".into(),
+            ]);
+        }
 
         // Technology-scoped fallbacks (always included)
         for tech in &technologies {
@@ -215,10 +226,7 @@ impl GithubScanner {
                                 .as_ref()
                                 .and_then(|l| l.as_str())
                                 .map(String::from);
-                            let topics = full
-                                .topics
-                                .clone()
-                                .unwrap_or_default();
+                            let topics = full.topics.clone().unwrap_or_default();
                             let html = full
                                 .html_url
                                 .as_ref()
@@ -229,8 +237,8 @@ impl GithubScanner {
                                 .clone()
                                 .unwrap_or_else(|| format!("{}/{}", owner, name));
                             (
-                                full.stargazers_count.unwrap_or(0) as u32,
-                                full.forks_count.unwrap_or(0) as u32,
+                                full.stargazers_count.unwrap_or(0),
+                                full.forks_count.unwrap_or(0),
                                 lang,
                                 topics,
                                 full.description.clone().or(repo.description.clone()),
@@ -268,10 +276,7 @@ impl GithubScanner {
                     )
                 };
 
-            let matched_file_paths = repo_paths
-                .get(&full_name)
-                .cloned()
-                .unwrap_or_default();
+            let matched_file_paths = repo_paths.get(&full_name).cloned().unwrap_or_default();
 
             out.push(ProjectDiscovery {
                 id: full_name.clone(),
@@ -282,10 +287,7 @@ impl GithubScanner {
                 last_updated: None,
                 stars,
                 forks,
-                tech_stack: language
-                    .into_iter()
-                    .chain(topics.into_iter())
-                    .collect(),
+                tech_stack: language.into_iter().chain(topics).collect(),
                 endpoints: Vec::new(),
                 health_status: None,
                 confidence_score: 0.5,
@@ -450,7 +452,11 @@ impl GithubScanner {
             if body.encoding != "base64" || body.content.is_empty() {
                 continue;
             }
-            let cleaned: String = body.content.chars().filter(|c| !c.is_whitespace()).collect();
+            let cleaned: String = body
+                .content
+                .chars()
+                .filter(|c| !c.is_whitespace())
+                .collect();
             let bytes = match base64::engine::general_purpose::STANDARD.decode(&cleaned) {
                 Ok(b) => b,
                 Err(_) => continue,
