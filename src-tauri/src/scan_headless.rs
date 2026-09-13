@@ -136,7 +136,11 @@ pub async fn run_scan_headless(
                 match github.fetch_file_history(&owner, &repo, file_path, 5).await {
                     Ok(versions) => {
                         for version in versions {
-                            let label = format!("{}@{}", file_path, &version.commit_sha[..8.min(version.commit_sha.len())]);
+                            let label = format!(
+                                "{}@{}",
+                                file_path,
+                                &version.commit_sha[..8.min(version.commit_sha.len())]
+                            );
                             raw_matches.extend(analyzer.analyze(&label, &version.content));
                             scanned_files += 1;
                         }
@@ -419,10 +423,7 @@ mod tests {
     #[test]
     fn parses_web_url() {
         let result = split_owner_repo("https://github.com/rust-lang/rust", "fallback/repo");
-        assert_eq!(
-            result,
-            Some(("rust-lang".to_string(), "rust".to_string()))
-        );
+        assert_eq!(result, Some(("rust-lang".to_string(), "rust".to_string())));
     }
 
     #[test]
@@ -431,10 +432,7 @@ mod tests {
             "https://api.github.com/repos/rust-lang/rust",
             "fallback/repo",
         );
-        assert_eq!(
-            result,
-            Some(("rust-lang".to_string(), "rust".to_string()))
-        );
+        assert_eq!(result, Some(("rust-lang".to_string(), "rust".to_string())));
     }
 
     #[test]

@@ -77,8 +77,8 @@ impl GithubScanner {
             sub_queries.push(format!("\"{technology}\" in:file filename:credentials"));
 
             for search_query in sub_queries {
-        // Minimum 5-second spacing between queries (10 req/min = 6 sec per request)
-        tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+                // Minimum 5-second spacing between queries (10 req/min = 6 sec per request)
+                tokio::time::sleep(std::time::Duration::from_secs(5)).await;
                 // Wait if the search rate limit is nearly exhausted
                 if let Ok(limits) = self.client.ratelimit().get().await {
                     let search = limits.resources.search;
@@ -392,16 +392,16 @@ impl GithubScanner {
         }
     }
 
-pub async fn fetch_file_history(
-    &self,
-    owner: &str,
-    repo: &str,
-    path: &str,
-    max_commits: usize,
-) -> Result<Vec<HistoricalFileVersion>> {
-    let mut versions = Vec::new();
+    pub async fn fetch_file_history(
+        &self,
+        owner: &str,
+        repo: &str,
+        path: &str,
+        max_commits: usize,
+    ) -> Result<Vec<HistoricalFileVersion>> {
+        let mut versions = Vec::new();
 
-let commits = self
+        let commits = self
             .client
             .repos(owner, repo)
             .list_commits()
@@ -409,41 +409,43 @@ let commits = self
             .send()
             .await?;
 
-    for commit in commits.items.iter().take(max_commits) {
-        let sha = commit.sha.clone();
-        // Use commit date if available, otherwise use current time
-        let date: Option<chrono::DateTime<chrono::Utc>> = None;
+        for commit in commits.items.iter().take(max_commits) {
+            let sha = commit.sha.clone();
+            // Use commit date if available, otherwise use current time
+            let date: Option<chrono::DateTime<chrono::Utc>> = None;
 
-        match self
-            .client
-            .repos(owner, repo)
-            .get_content()
-            .path(path)
-            .r#ref(&sha)
-            .send()
-            .await
-        {
-            Ok(content) => {
-                if let Some(item) = content.items.into_iter().next() {
-                    if let Some(encoded) = item.content {
-                        let cleaned: String = encoded.chars().filter(|c| !c.is_whitespace()).collect();
-                        if let Ok(bytes) = base64::engine::general_purpose::STANDARD.decode(&cleaned) {
-                            versions.push(HistoricalFileVersion {
-                                commit_sha: sha,
-                                commit_date: date,
-                                content: String::from_utf8_lossy(&bytes).into_owned(),
-                            });
+            match self
+                .client
+                .repos(owner, repo)
+                .get_content()
+                .path(path)
+                .r#ref(&sha)
+                .send()
+                .await
+            {
+                Ok(content) => {
+                    if let Some(item) = content.items.into_iter().next() {
+                        if let Some(encoded) = item.content {
+                            let cleaned: String =
+                                encoded.chars().filter(|c| !c.is_whitespace()).collect();
+                            if let Ok(bytes) =
+                                base64::engine::general_purpose::STANDARD.decode(&cleaned)
+                            {
+                                versions.push(HistoricalFileVersion {
+                                    commit_sha: sha,
+                                    commit_date: date,
+                                    content: String::from_utf8_lossy(&bytes).into_owned(),
+                                });
+                            }
                         }
                     }
                 }
+                Err(_) => continue,
             }
-            Err(_) => continue,
         }
+
+        Ok(versions)
     }
-
-    Ok(versions)
-}
-
 }
 #[derive(Debug, Clone)]
 pub struct HistoricalFileVersion {

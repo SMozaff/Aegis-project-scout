@@ -190,47 +190,51 @@ fn truncate_chars(value: &str, limit: usize) -> String {
 mod tests {
     use super::*;
 
-#[test]
-fn detects_openai_project_key() {
-    let analyzer = PatternAnalyzer::load_default().unwrap();
-    // sk-proj- followed by 65 chars (regex requires {60,})
-    let line = format!("OPENAI_API_KEY=sk-proj-{}", "a".repeat(65));
-    let matches = analyzer.analyze("test.env", &line);
-    assert!(
-        matches.iter().any(|m| m.pattern.pattern_name.contains("openai")),
-        "expected an openai match, got: {:?}",
-        matches
-            .iter()
-            .map(|m| &m.pattern.pattern_name)
-            .collect::<Vec<_>>()
-    );
-}
+    #[test]
+    fn detects_openai_project_key() {
+        let analyzer = PatternAnalyzer::load_default().unwrap();
+        // sk-proj- followed by 65 chars (regex requires {60,})
+        let line = format!("OPENAI_API_KEY=sk-proj-{}", "a".repeat(65));
+        let matches = analyzer.analyze("test.env", &line);
+        assert!(
+            matches
+                .iter()
+                .any(|m| m.pattern.pattern_name.contains("openai")),
+            "expected an openai match, got: {:?}",
+            matches
+                .iter()
+                .map(|m| &m.pattern.pattern_name)
+                .collect::<Vec<_>>()
+        );
+    }
 
-#[test]
-fn suppresses_placeholder_keys() {
-    let analyzer = PatternAnalyzer::load_default().unwrap();
-    let line = "OPENAI_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx";
-    let matches = analyzer.analyze("test.env", line);
-    // Placeholder pattern — should be detected (matches the openai_legacy regex)
-    let high_confidence: Vec<_> = matches
-        .iter()
-        .filter(|m| m.pattern.category == "auth_token")
-        .collect();
-    // Placeholder keys are detected by the pattern analyzer
-    assert!(
-        !high_confidence.is_empty(),
-        "placeholder should be detected; got no high-confidence matches"
-    );
-    // The placeholder key should match the openai_legacy pattern
-    assert!(
-        matches.iter().any(|m| m.pattern.pattern_name.contains("openai")),
-        "expected an openai legacy match, got: {:?}",
-        matches
+    #[test]
+    fn suppresses_placeholder_keys() {
+        let analyzer = PatternAnalyzer::load_default().unwrap();
+        let line = "OPENAI_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx";
+        let matches = analyzer.analyze("test.env", line);
+        // Placeholder pattern — should be detected (matches the openai_legacy regex)
+        let high_confidence: Vec<_> = matches
             .iter()
-            .map(|m| &m.pattern.pattern_name)
-            .collect::<Vec<_>>()
-    );
-}
+            .filter(|m| m.pattern.category == "auth_token")
+            .collect();
+        // Placeholder keys are detected by the pattern analyzer
+        assert!(
+            !high_confidence.is_empty(),
+            "placeholder should be detected; got no high-confidence matches"
+        );
+        // The placeholder key should match the openai_legacy pattern
+        assert!(
+            matches
+                .iter()
+                .any(|m| m.pattern.pattern_name.contains("openai")),
+            "expected an openai legacy match, got: {:?}",
+            matches
+                .iter()
+                .map(|m| &m.pattern.pattern_name)
+                .collect::<Vec<_>>()
+        );
+    }
 
     #[test]
     fn detects_github_pat() {
@@ -238,7 +242,9 @@ fn suppresses_placeholder_keys() {
         let line = "GITHUB_TOKEN=ghp_aBcDeF1234567890aBcDeF1234567890abcd";
         let matches = analyzer.analyze("test.env", line);
         assert!(
-            matches.iter().any(|m| m.pattern.pattern_name.contains("github")),
+            matches
+                .iter()
+                .any(|m| m.pattern.pattern_name.contains("github")),
             "expected a github match, got: {:?}",
             matches
                 .iter()
