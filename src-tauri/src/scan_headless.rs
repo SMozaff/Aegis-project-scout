@@ -59,7 +59,7 @@ pub async fn run_scan_headless(
     let analyzer = PatternAnalyzer::load_default()?;
     let query = settings.languages.join(" OR ");
     let mut repositories = github
-        .search_projects(&query, settings.lookback_days as u32)
+        .search_projects(&query, settings.lookback_days as u32, config.scan_deep)
         .await
         .map_err(|error| error.to_string())?;
     repositories.truncate(settings.max_repositories as usize);

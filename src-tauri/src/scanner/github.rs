@@ -38,6 +38,7 @@ impl GithubScanner {
         &self,
         query: &str,
         _lookback: u32,
+        scan_deep: bool,
     ) -> Result<Vec<ProjectDiscovery>> {
         let technologies: Vec<&str> = query
             .split(" OR ")
@@ -53,39 +54,37 @@ impl GithubScanner {
         let mut repo_paths: HashMap<String, Vec<String>> = HashMap::new();
 
         for technology in technologies {
-            let sub_queries = [
-                // OpenAI
-                format!("\"sk-proj-\" in:file"),
-                format!("\"sk-svcacct-\" in:file"),
-                // Anthropic
-                format!("\"sk-ant-api03-\" in:file"),
-                // GitHub PATs
-                format!("\"ghp_\" in:file"),
-                format!("\"github_pat_\" in:file"),
-                // AWS
-                format!("\"AKIA\" in:file"),
-                format!("\"aws_secret_access_key\" in:file"),
-                // Google
-                format!("\"AIza\" in:file"),
-                // Slack
-                format!("\"xoxb-\" in:file"),
-                format!("\"xoxp-\" in:file"),
-                // Stripe
-                format!("\"sk_live_\" in:file"),
-                // SendGrid
-                format!("\"SG.\" extension:env OR extension:yml OR extension:json"),
-                // Technology-scoped fallback
-                format!("\"{technology}\" in:file filename:.env"),
-                format!("\"{technology}\" in:file filename:credentials"),
+            let mut sub_queries = vec![
+                "\"sk-proj-\" in:file".to_string(),
+                "\"AKIA\" in:file".to_string(),
+                "\"ghp_\" in:file".to_string(),
             ];
 
+            if scan_deep {
+                sub_queries.extend([
+                    "\"sk-ant-api03-\" in:file".to_string(),
+                    "\"sk_live_\" in:file".to_string(),
+                    "\"github_pat_\" in:file".to_string(),
+                    "\"aws_secret_access_key\" in:file".to_string(),
+                    "\"AIza\" in:file".to_string(),
+                    "\"xoxb-\" in:file".to_string(),
+                    "\"xoxp-\" in:file".to_string(),
+                    "\"SG.\" extension:env OR extension:yml OR extension:json".to_string(),
+                ]);
+            }
+
+            sub_queries.push(format!("\"{technology}\" in:file filename:.env"));
+            sub_queries.push(format!("\"{technology}\" in:file filename:credentials"));
+
             for search_query in sub_queries {
+        // Minimum 5-second spacing between queries (10 req/min = 6 sec per request)
+        tokio::time::sleep(std::time::Duration::from_secs(5)).await;
                 // Wait if the search rate limit is nearly exhausted
                 if let Ok(limits) = self.client.ratelimit().get().await {
                     let search = limits.resources.search;
                     if search.remaining < 3 {
                         let now = chrono::Utc::now().timestamp() as u64;
-                        let reset = search.reset as u64;
+                        let reset = search.reset;
                         let wait = reset.saturating_sub(now).saturating_add(2).min(120);
                         eprintln!(
                             "[throttle] search rate limit low ({}), sleeping {}s",
@@ -97,37 +96,45 @@ impl GithubScanner {
 
                 let mut collected = 0usize;
 
-                let mut page: Page<models::Code> = self
-                    .client
-                    .search()
-                    .code(&search_query)
-                    .per_page(RESULTS_PER_QUERY as u8)
-                    .send()
-                    .await
-                    .map_err(|e| {
-                        let display = format!("{}", e);
-                        let detail = if display.is_empty() || display == "GitHub" {
-                            format!("{:?}", e)
-                        } else {
-                            display
-                        };
-                        if detail.contains("403")
-                            || detail.contains("429")
-                            || detail.to_lowercase().contains("rate limit")
+                let mut page: Page<models::Code> = {
+                    let mut attempt = 0u32;
+                    loop {
+                        match self
+                            .client
+                            .search()
+                            .code(&search_query)
+                            .per_page(RESULTS_PER_QUERY as u8)
+                            .send()
+                            .await
                         {
-                            anyhow!(
-                                "GitHub API rate limit hit while searching {:?}. Reduce scan limits or wait. Underlying: {}",
-                                search_query,
-                                detail
-                            )
-                        } else {
-                            anyhow!(
-                                "GitHub code search failed for query {:?}: {}",
-                                search_query,
-                                detail
-                            )
+                            Ok(p) => {
+                                break p;
+                            }
+                            Err(e) => {
+                                let detail = format!("{}", e);
+                                let is_rate_limit = detail.contains("403")
+                                    || detail.contains("429")
+                                    || detail.to_lowercase().contains("rate limit");
+                                if is_rate_limit && attempt < 3 {
+                                    attempt += 1;
+                                    let wait = 60u64;
+                                    eprintln!(
+                                        "[retry] rate limit on {:?} (attempt {}/3), waiting {}s",
+                                        search_query, attempt, wait
+                                    );
+                                    tokio::time::sleep(std::time::Duration::from_secs(wait)).await;
+                                    continue;
+                                }
+                                return Err(anyhow!(
+                                    "GitHub code search failed for query {:?} after {} attempts: {}",
+                                    search_query,
+                                    attempt,
+                                    detail
+                                ));
+                            }
                         }
-                    })?;
+                    }
+                };
 
                 for item in &page.items {
                     if collected >= RESULTS_PER_QUERY {
